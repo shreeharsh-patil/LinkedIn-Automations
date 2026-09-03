@@ -1,0 +1,29 @@
+{
+  "name": "@linkedctl/studio",
+  "version": "1.0.0",
+  "description": "LinkedCtl Studio — Web Dashboard, Agent Orchestrator & Autonomous LinkedIn Publishing Pipeline with Google Flow Agent",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/cli.ts server",
+    "cli": "ts-node src/cli.ts",
+    "dev": "ts-node-dev --respawn src/cli.ts server",
+    "test": "ts-node tests/platform.test.ts"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.10.10",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.3"
+  }
+}
