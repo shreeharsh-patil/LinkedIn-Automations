@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2026 Oleksii PELYKH
+
+export type { OAuthCredentials, LinkedctlConfig, ConfigResult, ResolveOptions } from "./types.js";
+export { loadConfigFile, CONFIG_DIR, DEFAULT_API_VERSION } from "./loader.js";
+export type { LoadResult } from "./loader.js";
+export { validateConfig, isValidProfileName } from "./validate.js";
+export type { ValidationResult } from "./validate.js";
+export { applyEnvOverlay } from "./env.js";
+export {
+  saveOAuthTokens,
+  saveOAuthClientCredentials,
+  saveOAuthScope,
+  saveOAuthPkce,
+  saveApiVersion,
+  clearOAuthTokens,
+} from "./writer.js";
+export { resolveConfig, ConfigError } from "./resolve.js";
+export { PRODUCT_PRESETS, PRODUCT_NAMES, resolveProductScopes } from "./products.js";
+export type { ProductPreset } from "./products.js";
+export { listProfileScopes, findProfilesWithScopes } from "./profiles.js";
+export type { ProfileScopeSummary } from "./profiles.js";
