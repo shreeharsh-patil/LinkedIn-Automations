@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.os }})
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm format:check
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm license-check
+      - run: pnpm publish-check
+      - run: pnpm test
+
+  publish-npm:
+    name: Publish to npm
+    timeout-minutes: 10
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+        with:
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing requires npm >=11.5.1 for OIDC token exchange
+      - name: Upgrade npm
+        run: npm install -g "npm@>=11.5.1"
+
+      - name: Stamp version
+        env:
+          RAW_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${RAW_TAG#v}"
+          # Build metadata (+build) intentionally excluded — only release and pre-release tags accepted
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$'; then
+            echo "::error::Tag '$RAW_TAG' is not a valid semver version"
+            exit 1
+          fi
+          pnpm -r exec npm version "$VERSION" --no-git-tag-version --allow-same-version
+          VERSION="$VERSION" node -e "
+            const fs = require('fs');
+            const s = JSON.parse(fs.readFileSync('server.json', 'utf8'));
+            s.version = process.env.VERSION;
+            s.packages.forEach(p => { p.version = process.env.VERSION; });
+            fs.writeFileSync('server.json', JSON.stringify(s, null, 2) + '\n');
+          "
+          VERSION="$VERSION" node -e "
+            const fs = require('fs');
+            const y = fs.readFileSync('smithery.yaml', 'utf8');
+            fs.writeFileSync('smithery.yaml', y.replace(/linkedctl@[^'\"]+/g, 'linkedctl@' + process.env.VERSION));
+          "
+          VERSION="$VERSION" node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('.claude-plugin/plugin.json', 'utf8'));
+            p.version = process.env.VERSION;
+            fs.writeFileSync('.claude-plugin/plugin.json', JSON.stringify(p, null, 2) + '\n');
+          "
+          VERSION="$VERSION" node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('.claude-plugin/marketplace.json', 'utf8'));
+            m.plugins.forEach(p => { p.version = process.env.VERSION; });
+            fs.writeFileSync('.claude-plugin/marketplace.json', JSON.stringify(m, null, 2) + '\n');
+          "
+
+      - run: pnpm build
+
+      - name: Verify packages
+        run: pnpm -r publish --dry-run --access public --no-git-checks
+
+      - name: Publish packages
+        run: pnpm -r publish --access public --no-git-checks --report-summary --provenance
