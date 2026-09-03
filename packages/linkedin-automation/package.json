@@ -1,0 +1,59 @@
+{
+  "name": "@linkedctl/linkedin-automation",
+  "version": "0.0.0",
+  "description": "LinkedIn automation integration layer for LinkedCtl and Flow Agent",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "license": "AGPL-3.0-only",
+  "author": "Alexey Pelykh (https://github.com/alexey-pelykh)",
+  "homepage": "https://github.com/alexey-pelykh/linkedctl/tree/main/packages/linkedin-automation",
+  "bugs": "https://github.com/alexey-pelykh/linkedctl/issues",
+  "funding": "https://github.com/sponsors/alexey-pelykh",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alexey-pelykh/linkedctl.git",
+    "directory": "packages/linkedin-automation"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "linkedin-auto": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "linkedin",
+    "automation",
+    "social-media",
+    "content-publishing"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "prepack": "node -e \"fs.copyFileSync('../../LICENSE', './LICENSE')\"",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src/",
+    "manual": "node dist/cli.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@linkedctl/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
