@@ -143,12 +143,13 @@ export class LlmAgentService {
 
   private async callGroq(prompt: string, systemPrompt: string | undefined, apiKey: string): Promise<string> {
     logger.debug(`Calling Groq API (free high-speed models)...`);
-    const models = [
-      this.config.groqModel || 'llama-3.3-70b-versatile',
-      'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'mixtral-8x7b-32768',
-    ];
+    const models = Array.from(
+      new Set([
+        this.config.groqModel || 'llama-3.3-70b-versatile',
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+      ])
+    );
 
     let lastError: Error | null = null;
     for (const model of models) {

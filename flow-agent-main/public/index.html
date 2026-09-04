@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LinkedCtl Studio | Autonomous LinkedIn Content & Image Pipeline</title>
+  <title>LinkedIn | Developer Publishing & Image Pipeline</title>
   <meta name="description" content="Professional autonomous LinkedIn post generator, AI image synthesis, and fact-verified publishing studio.">
-  <meta name="theme-color" content="#090a0f">
+  <meta name="theme-color" content="#090b0e">
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,55 +13,32 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Mobile Drawer Backdrop -->
+  <div class="sidebar-drawer-backdrop" id="sidebarBackdrop"></div>
+
   <div class="app-container">
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar">
+    <!-- ─────────────────────────────────────────────────────────────
+         SIDEBAR NAVIGATION
+         ───────────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="appSidebar">
+      <!-- Brand -->
       <div class="brand">
-        <div class="brand-logo">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="brand-logo" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path>
             <rect x="2" y="9" width="4" height="12"></rect>
             <circle cx="4" cy="4" r="2"></circle>
           </svg>
         </div>
         <div class="brand-info">
-          <span class="brand-title">LinkedCtl</span>
-          <span class="brand-subtitle">Autonomous Studio</span>
+          <span class="brand-title">LinkedIn</span>
+          <span class="brand-subtitle">Studio</span>
         </div>
       </div>
 
-      <!-- LinkedIn Account Status -->
-      <div class="connection-status" id="linkedinStatusCard">
-        <div class="status-header">
-          <span class="status-dot" id="linkedinStatusDot"></span>
-          <div class="status-text">
-            <span class="status-name" id="linkedinStatusTitle">Checking Auth...</span>
-            <span class="status-meta" id="linkedinStatusSub">LinkedIn API</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Flow Agent Image Engine Status -->
-      <div class="connection-status" id="flowStatusCard">
-        <div class="status-header">
-          <span class="status-dot" id="statusDot"></span>
-          <div class="status-text">
-            <span class="status-name" id="statusTitle">Image Engine</span>
-            <span class="status-meta" id="statusSub">Port 8001</span>
-          </div>
-        </div>
-        <button id="btnOpenFlowTab" class="btn btn-ghost btn-xs" title="Launch or sync Google Flow image session">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-            <polyline points="15 3 21 3 21 9"></polyline>
-            <line x1="10" y1="14" x2="21" y2="3"></line>
-          </svg>
-          Sync Image Engine
-        </button>
-      </div>
-
-      <!-- Navigation -->
-      <nav class="nav-menu">
+      <!-- Navigation Menu -->
+      <nav class="nav-menu" aria-label="Main Navigation">
+        <span class="nav-section-label">Workflow</span>
         <button class="nav-item active" data-tab="linkedin-compose" id="navTabLiCompose">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -92,6 +69,8 @@
           </svg>
           Queue & History
         </button>
+
+        <span class="nav-section-label">Configuration</span>
         <button class="nav-item" data-tab="linkedin-settings" id="navTabLiSettings">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
@@ -108,415 +87,532 @@
         </button>
       </nav>
 
-      <div class="sidebar-footer">
-        <span class="version-label">v1.0.0</span>
-        <span class="engine-tag">Autonomous</span>
+      <!-- Compact Connections / System Status Section -->
+      <div class="sidebar-status-section" aria-label="System Connections">
+        <span class="nav-section-label" style="padding: 0 4px 4px 4px;">Connections</span>
+        
+        <!-- LinkedIn Status Row -->
+        <div class="status-row-item" id="linkedinStatusCard" title="LinkedIn API connection status">
+          <div class="status-row-left">
+            <span class="status-dot" id="linkedinStatusDot"></span>
+            <span class="status-label">LinkedIn</span>
+          </div>
+          <span class="status-val-pill" id="linkedinStatusTitle">Checking...</span>
+          <!-- Hidden sub-label for JS compatibility -->
+          <span id="linkedinStatusSub" style="display:none;"></span>
+        </div>
+
+        <!-- Flow Agent Engine Status Row -->
+        <div class="status-row-item" id="flowStatusCard" title="Flow Agent Image Engine status">
+          <div class="status-row-left">
+            <span class="status-dot" id="statusDot"></span>
+            <span class="status-label">Flow Agent</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span class="status-val-pill" id="statusTitle">Engine</span>
+            <button id="btnOpenFlowTab" class="btn btn-ghost btn-xs" style="padding: 1px 4px;" title="Launch or sync Google Flow image session">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </button>
+          </div>
+          <!-- Hidden sub-label for JS compatibility -->
+          <span id="statusSub" style="display:none;"></span>
+        </div>
+
+        <div class="sidebar-footer">
+          <span class="version-label">v1.0.0</span>
+          <span class="engine-tag">Autonomous</span>
+        </div>
       </div>
     </aside>
 
-    <!-- Main Content Area -->
+    <!-- ─────────────────────────────────────────────────────────────
+         MAIN CONTENT AREA
+         ───────────────────────────────────────────────────────────── -->
     <main class="main-content">
-      <!-- Top Bar Header -->
-      <header class="topbar">
-        <div class="topbar-title">
-          <h1 id="pageTitle">Post Composer</h1>
-          <p id="pageSubtitle">Draft posts, synthesize AI picture visuals, preview in real time, and publish autonomously</p>
-        </div>
-        <div class="topbar-stats">
-          <div class="stat-tag">
-            <span class="stat-key">Account:</span>
-            <span class="stat-val" id="userBadge">Not connected</span>
-          </div>
-          <div class="stat-tag">
-            <span class="stat-key">Mode:</span>
-            <span class="stat-val" id="modeBadge">SAFE</span>
-          </div>
-          <button class="btn btn-secondary btn-xs" id="btnRefreshAll" title="Refresh connections and data">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
-            </svg>
-            Sync
-          </button>
-        </div>
-      </header>
-
-      <!-- TAB 1: POST COMPOSER & AI IMAGE GENERATOR -->
-      <section class="tab-content active" id="tab-linkedin-compose">
-        <div class="layout-columns">
-          <!-- Composer Form -->
-          <div class="panel form-panel">
-            <div class="panel-header">
-              <h2>Post Editor</h2>
-              <span class="panel-desc">Compose captions, attach images, or generate AI visuals via Flow Agent</span>
+      <div class="content-wrapper">
+        <!-- Top Bar Header -->
+        <header class="topbar">
+          <div class="topbar-left">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle navigation menu">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+            </button>
+            <div class="topbar-title">
+              <h1 id="pageTitle">Post Composer</h1>
+              <p id="pageSubtitle">Create, preview and publish technical LinkedIn posts.</p>
             </div>
+          </div>
+          
+          <div class="topbar-stats">
+            <div class="stat-pill" title="LinkedIn account authorization state">
+              <span class="stat-label">LinkedIn</span>
+              <span class="stat-value">
+                <span class="status-dot" id="headerAuthDot"></span>
+                <span id="userBadge">Not connected</span>
+              </span>
+            </div>
+            <div class="stat-pill" title="Current pipeline automation safeguard mode">
+              <span class="stat-label">Mode</span>
+              <span class="stat-value" id="modeBadge" style="font-family: var(--font-mono); font-size: 11px;">SAFE</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btnRefreshAll" title="Sync connection states and database records">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+              </svg>
+              Sync
+            </button>
+          </div>
+        </header>
 
-            <form id="liComposeForm" class="form-body">
-              <!-- Informative Post Synthesizer -->
-              <div class="card-sub-section" style="border-left: 3px solid var(--accent-primary);">
-                <div class="sub-section-head">
-                  <div>
-                    <h4>Informative Engineering Synthesizer</h4>
-                    <p class="sub-desc">Structure high-value technical posts without marketing fluff or emoji spam</p>
-                  </div>
-                  <button type="button" class="btn btn-secondary btn-sm" id="btnSynthesizeInformative">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 20h9"></path>
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                    </svg>
-                    Synthesize Draft
-                  </button>
-                </div>
-                <div class="form-grid-2" style="margin-top: 10px;">
-                  <div class="form-group">
-                    <label for="liInformativeArchetype">Technical Blueprint</label>
-                    <select id="liInformativeArchetype">
-                      <option value="deepdive" selected>🏗️ Architecture & System Deep-Dive</option>
-                      <option value="performance">⚡ Performance Optimization Win</option>
-                      <option value="howitworks">🔬 "How It Works" Technical Breakdown</option>
-                      <option value="postmortem">🛡️ Post-Mortem & Incident Analysis</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label for="liInformativeTopic">Core Topic or Component</label>
-                    <input type="text" id="liInformativeTopic" placeholder="e.g. Distributed Consensus in Raft / Zero-Copy Kafka IO" />
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                  <label for="liPostText">Caption Content <span class="required">*</span></label>
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <span class="char-count" id="liWordCount">0 words</span>
-                    <span class="char-count" id="liCharCount">0 / 3,000</span>
-                  </div>
-                </div>
-                <textarea id="liPostText" rows="7" placeholder="Share a technical update, architecture highlight, milestone, or release note..." required></textarea>
+        <!-- ─────────────────────────────────────────────────────────
+             TAB 1: POST COMPOSER & IMAGE PIPELINE
+             ───────────────────────────────────────────────────────── -->
+        <section class="tab-content active" id="tab-linkedin-compose">
+          <div class="composer-grid">
+            <!-- Left Column: Post Editor (~62%) -->
+            <div class="editor-column">
+              <form id="liComposeForm" class="editor-column" onsubmit="return false;">
                 
-                <!-- Quick Hashtag Insertion Chips -->
-                <div class="quick-tags-container">
-                  <span class="quick-tags-label">Insert Hashtags:</span>
-                  <div class="quick-tags" id="quickTags">
-                    <button type="button" class="tag-chip" data-tag="#softwareengineering">#softwareengineering</button>
-                    <button type="button" class="tag-chip" data-tag="#systemdesign">#systemdesign</button>
-                    <button type="button" class="tag-chip" data-tag="#architecture">#architecture</button>
-                    <button type="button" class="tag-chip" data-tag="#performance">#performance</button>
-                    <button type="button" class="tag-chip" data-tag="#devops">#devops</button>
-                    <button type="button" class="tag-chip" data-tag="#typescript">#typescript</button>
-                    <button type="button" class="tag-chip" data-tag="#cloud">#cloud</button>
-                    <button type="button" class="tag-chip" data-tag="#ai">#ai</button>
+                <!-- Section 1: AI Draft Assistant (Compact tool panel) -->
+                <div class="draft-assistant-card">
+                  <div class="assistant-header">
+                    <div class="assistant-title-group">
+                      <h3>AI Draft Assistant</h3>
+                      <span class="assistant-badge">LLM Synthesizer</span>
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnSynthesizeInformative" title="Generate an informative post draft from your topic">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                      </svg>
+                      Generate draft
+                    </button>
                   </div>
-                </div>
-              </div>
 
-              <!-- AI Visual Generator Section -->
-              <div class="card-sub-section">
-                <div class="sub-section-head">
-                  <div>
-                    <h4>AI Image Generator</h4>
-                    <p class="sub-desc">Synthesize technical diagrams & editorial pictures matching your post</p>
+                  <div class="assistant-controls">
+                    <select id="liInformativeArchetype" aria-label="Technical Blueprint Architecture">
+                      <option value="deepdive" selected>Architecture & System Deep-Dive</option>
+                      <option value="performance">Performance Optimization Win</option>
+                      <option value="howitworks">Technical Breakdown & Internals</option>
+                      <option value="postmortem">Post-Mortem & Incident Analysis</option>
+                    </select>
+                    <input type="text" id="liInformativeTopic" placeholder="Core Topic (e.g., Distributed consensus in Raft, Zero-copy I/O)" aria-label="Post topic" />
                   </div>
-                  <button type="button" class="btn btn-secondary btn-sm" id="btnLiGenVisual">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                    Generate Image
-                  </button>
                 </div>
-                <div class="form-grid-2" style="margin-top: 10px;">
-                  <div class="form-group">
-                    <input type="text" id="liVisualPrompt" placeholder="Visual prompt (leave blank to auto-synthesize from caption)" />
+
+                <!-- Section 2: Caption Editor (The visual focus) -->
+                <div class="caption-card">
+                  <div class="caption-header">
+                    <span class="caption-label">Caption <span style="color: var(--status-danger);">*</span></span>
+                    <div class="caption-meta-counts">
+                      <span id="liWordCount">0 words</span>
+                      <span>•</span>
+                      <span id="liCharCount">0 / 3,000</span>
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <select id="liVisualAspect">
+
+                  <!-- Formatting Toolbar -->
+                  <div class="editor-toolbar" role="toolbar" aria-label="Editor formatting tools">
+                    <button type="button" class="toolbar-btn" id="tbBtnBold" title="Bold text (**text**)">
+                      <strong>B</strong>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="tbBtnCode" title="Code snippet (`code`)">
+                      <code>&lt;/&gt;</code>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="tbBtnList" title="Bullet item (- list)">
+                      <span>• List</span>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="tbBtnLink" title="Link template [text](url)">
+                      <span>🔗 Link</span>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="tbBtnEmoji" title="Insert bullet emoji">
+                      <span>⚡ Bullet</span>
+                    </button>
+                    <button type="button" class="toolbar-btn" id="btnLiClear" style="margin-left: auto; color: var(--text-muted);" title="Clear caption editor">
+                      Clear
+                    </button>
+                  </div>
+
+                  <textarea 
+                    id="liPostText" 
+                    class="caption-textarea" 
+                    rows="8" 
+                    placeholder="Share an engineering insight, project update, lesson, or release..." 
+                    required 
+                    aria-label="Caption text content"
+                  ></textarea>
+
+                  <!-- Suggested Hashtags -->
+                  <div class="hashtags-section">
+                    <span class="hashtags-title">Suggested hashtags</span>
+                    <div class="hashtags-container" id="quickTags">
+                      <button type="button" class="tag-chip" data-tag="#softwareengineering">#softwareengineering</button>
+                      <button type="button" class="tag-chip" data-tag="#systemdesign">#systemdesign</button>
+                      <button type="button" class="tag-chip" data-tag="#architecture">#architecture</button>
+                      <button type="button" class="tag-chip" data-tag="#performance">#performance</button>
+                      <button type="button" class="tag-chip" data-tag="#devops">#devops</button>
+                      <button type="button" class="tag-chip" data-tag="#typescript">#typescript</button>
+                      <button type="button" class="tag-chip" data-tag="#cloud">#cloud</button>
+                      <button type="button" class="tag-chip" data-tag="#ai">#ai</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Section 3: Media / Image Generator -->
+                <div class="media-section-card">
+                  <div class="media-section-head">
+                    <div>
+                      <h3>Media</h3>
+                      <p>Add an image or generate an architectural diagram for your post.</p>
+                    </div>
+                  </div>
+
+                  <div class="media-input-grid">
+                    <input type="text" id="liVisualPrompt" placeholder="Visual prompt (leave blank to synthesize from caption)" aria-label="Visual prompt" />
+                    <select id="liVisualAspect" aria-label="Image aspect ratio">
                       <option value="landscape" selected>16:9 Landscape</option>
                       <option value="square">1:1 Square</option>
                       <option value="portrait">9:16 Portrait</option>
                       <option value="4x3">4:3 Standard</option>
                       <option value="3x4">3:4 Vertical</option>
                     </select>
-                  </div>
-                </div>
-
-                <!-- Rich Image Preview Card -->
-                <div id="liVisualPreviewBox" class="visual-preview-box" style="display: none;">
-                  <div class="preview-img-container">
-                    <img id="liVisualPreviewImg" src="" alt="Generated Visual" class="clickable-preview" title="Click to view full size" />
-                    <div class="img-overlay-zoom">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        <line x1="11" y1="8" x2="11" y2="14"></line>
-                        <line x1="8" y1="11" x2="14" y2="11"></line>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btnLiGenVisual">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                       </svg>
-                      Click to expand
-                    </div>
+                      Generate image
+                    </button>
                   </div>
-                  <div class="visual-meta">
-                    <span id="liVisualPath" class="path-text"></span>
-                    <div style="display: flex; gap: 6px; align-items: center;">
+
+                  <!-- Attached Image Preview Container -->
+                  <div id="liVisualPreviewBox" class="visual-preview-box" style="display: none;">
+                    <div class="preview-thumb-left">
+                      <div class="preview-img-container" id="previewImgContainer" title="Click to view full size">
+                        <img id="liVisualPreviewImg" src="" alt="Attached Image" />
+                      </div>
+                      <div class="preview-meta-info">
+                        <span id="liVisualPath" class="path-text">image.png</span>
+                        <span class="preview-meta-sub">Attached to LinkedIn post</span>
+                      </div>
+                    </div>
+                    <div class="preview-thumb-actions">
                       <button type="button" class="btn btn-secondary btn-xs" id="btnVisionCaptionGenerated" title="Extract engineering facts and auto-caption this image using Gemini Vision">
-                        ✨ Auto-Caption with Gemini
+                        ✨ Auto-Caption
                       </button>
                       <button type="button" class="btn btn-ghost btn-xs" id="btnZoomVisual">Expand</button>
-                      <button type="button" class="btn btn-ghost btn-xs" id="btnRemoveVisual">Remove</button>
+                      <button type="button" class="btn btn-ghost btn-xs" id="btnRemoveVisual" style="color: var(--status-danger);">Remove</button>
                     </div>
+                  </div>
+
+                  <!-- File Upload Dropzone Row -->
+                  <div class="file-dropzone-row" onclick="document.getElementById('liImageFile').click();">
+                    <div class="file-dropzone-left">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                      </svg>
+                      <span id="liFileHint">Upload image / diagram from device (PNG, JPG, WebP)</span>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-xs" onclick="event.stopPropagation(); document.getElementById('liImageFile').click();">
+                      Browse
+                    </button>
+                    <input type="file" id="liImageFile" accept="image/png,image/jpeg,image/webp" style="display: none;" />
+                  </div>
+                  <button type="button" class="btn btn-secondary btn-xs" id="btnVisionCaptionUploaded" style="display: none; align-self: flex-start;">
+                    ✨ Auto-Caption Uploaded Image
+                  </button>
+                </div>
+
+                <!-- Section 4: Composer Action Bar -->
+                <div class="composer-action-bar">
+                  <div></div>
+                  <div class="action-bar-right">
+                    <button type="button" class="btn btn-ghost" id="btnLiSaveDraft">
+                      Save Draft
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btnLiSchedule">
+                      Schedule Post
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="btnLiPublishNow">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                      Publish Now
+                    </button>
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            <!-- Right Column: LinkedIn Preview (~38%, Sticky) -->
+            <div class="preview-column">
+              <div class="preview-panel-container">
+                <div class="preview-card-header">
+                  <h3>LinkedIn Feed Preview</h3>
+                  <span class="preview-badge">Live Simulation</span>
+                </div>
+
+                <div class="linkedin-mock-card">
+                  <div class="mock-header">
+                    <div class="mock-avatar">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                      </svg>
+                    </div>
+                    <div class="mock-author">
+                      <span class="mock-name" id="mockUserName">Your Name</span>
+                      <span class="mock-headline" id="mockUserHeadline">Software Engineer • Just now • 🌐</span>
+                    </div>
+                  </div>
+
+                  <div class="mock-body empty" id="mockText">Your post preview will appear here.</div>
+
+                  <!-- Mock Media Attachment -->
+                  <div class="mock-media" id="mockMedia" style="display: none;">
+                    <img id="mockImage" src="" alt="Post Attachment Preview" class="clickable-preview" title="Click to expand full size" />
+                  </div>
+
+                  <!-- Realistic Engagement Bar -->
+                  <div class="mock-footer">
+                    <span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
+                      </svg>
+                      Like
+                    </span>
+                    <span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                      </svg>
+                      Comment
+                    </span>
+                    <span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="17 1 21 5 17 9"></polyline>
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                        <polyline points="7 23 3 19 7 15"></polyline>
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                      </svg>
+                      Repost
+                    </span>
+                    <span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                      </svg>
+                      Send
+                    </span>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <!-- Local Image File Upload -->
-              <div class="form-group">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <label for="liImageFile">Or Attach Local Image / Architecture Diagram</label>
-                  <button type="button" class="btn btn-secondary btn-xs" id="btnVisionCaptionUploaded" style="display: none;" title="Analyze uploaded diagram and write informative post">
-                    ✨ Auto-Caption with Gemini Vision
+        <!-- ─────────────────────────────────────────────────────────
+             TAB 2: GITHUB DISCOVERY
+             ───────────────────────────────────────────────────────── -->
+        <section class="tab-content" id="tab-linkedin-discover">
+          <div class="panel">
+            <div class="panel-header">
+              <h2>GitHub Activity Discovery & Verification</h2>
+              <span class="panel-desc">Analyze repositories, extract verified engineering facts, check claim authenticity, and generate drafts</span>
+            </div>
+
+            <form id="liDiscoverForm" class="form-body" style="max-width: 620px;">
+              <div class="form-group" style="display: flex; flex-direction: column; gap: 8px;">
+                <label for="liRepoInput">GitHub Repository <span style="color: var(--status-danger);">*</span></label>
+                <div style="display: flex; gap: 8px;">
+                  <input type="text" id="liRepoInput" placeholder="e.g. facebook/react or vercel/next.js" required />
+                  <button type="submit" class="btn btn-primary" id="btnRunDiscovery">
+                    Analyze Repository
                   </button>
                 </div>
-                <div class="file-input-wrapper">
-                  <input type="file" id="liImageFile" accept="image/png,image/jpeg,image/webp" />
-                  <span class="file-hint" id="liFileHint">Choose image file (max 5 MB)...</span>
+                <div class="sample-repos" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                  <span style="font-size: 11px; color: var(--text-muted);">Quick repos:</span>
+                  <button type="button" class="btn btn-ghost btn-xs sample-repo-btn" data-repo="facebook/react">facebook/react</button>
+                  <button type="button" class="btn btn-ghost btn-xs sample-repo-btn" data-repo="vercel/next.js">vercel/next.js</button>
+                  <button type="button" class="btn btn-ghost btn-xs sample-repo-btn" data-repo="astral-sh/uv">astral-sh/uv</button>
                 </div>
-              </div>
-
-              <!-- Action Bar -->
-              <div class="form-action-row">
-                <button type="button" class="btn btn-ghost" id="btnLiClear">
-                  Clear
-                </button>
-                <button type="button" class="btn btn-secondary" id="btnLiSaveDraft">
-                  Save as Draft
-                </button>
-                <button type="button" class="btn btn-secondary" id="btnLiSchedule">
-                  Schedule Post
-                </button>
-                <button type="submit" class="btn btn-primary" id="btnLiPublishNow">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
-                  Publish Now
-                </button>
               </div>
             </form>
-          </div>
 
-          <!-- Live LinkedIn Feed Mockup Preview -->
-          <div class="panel preview-panel">
-            <div class="panel-header">
-              <h2>LinkedIn Feed Preview</h2>
-              <span class="panel-desc">Real-time simulation of your LinkedIn post</span>
-            </div>
-
-            <div class="linkedin-mock-card">
-              <div class="mock-header">
-                <div class="mock-avatar">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
-                </div>
-                <div class="mock-author">
-                  <span class="mock-name" id="mockUserName">Your Name</span>
-                  <span class="mock-headline" id="mockUserHeadline">Software Engineer • Just now • 🌐</span>
-                </div>
-              </div>
-
-              <div class="mock-body" id="mockText">
-                Write your post caption on the left to see the live preview here...
-              </div>
-
-              <!-- High-Resolution Mockup Media Attachment -->
-              <div class="mock-media" id="mockMedia" style="display: none;">
-                <img id="mockImage" src="" alt="Post Attachment" class="clickable-preview" title="Click to view full size" />
-              </div>
-
-              <div class="mock-footer">
-                <span>👍 Like</span>
-                <span>💬 Comment</span>
-                <span>🔁 Repost</span>
-                <span>📤 Send</span>
-              </div>
+            <div class="discovery-results" id="discoveryResults" style="margin-top: 20px;">
+              <div class="empty-state">Enter a GitHub repository above to discover and analyze commit activity.</div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- TAB 2: GITHUB DISCOVERY -->
-      <section class="tab-content" id="tab-linkedin-discover">
-        <div class="panel">
-          <div class="panel-header">
-            <h2>GitHub Activity Discovery & Multi-Agent Pipeline</h2>
-            <span class="panel-desc">Analyze repositories, extract verified engineering facts, check claim authenticity, and generate drafts</span>
-          </div>
-
-          <form id="liDiscoverForm" class="form-body" style="max-width: 600px;">
-            <div class="form-group">
-              <label for="liRepoInput">GitHub Repository <span class="required">*</span></label>
-              <div style="display: flex; gap: 8px;">
-                <input type="text" id="liRepoInput" placeholder="e.g. facebook/react or vercel/next.js" required />
-                <button type="submit" class="btn btn-primary" id="btnRunDiscovery">
-                  Analyze Repository
-                </button>
-              </div>
-              <div class="sample-repos" style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                <span style="font-size: 11px; color: var(--text-muted);">Quick repos:</span>
-                <button type="button" class="btn btn-ghost btn-xs sample-repo-btn" data-repo="facebook/react">facebook/react</button>
-                <button type="button" class="btn btn-ghost btn-xs sample-repo-btn" data-repo="vercel/next.js">vercel/next.js</button>
-                <button type="button" class="btn btn-ghost btn-xs sample-repo-btn" data-repo="astral-sh/uv">astral-sh/uv</button>
-              </div>
-            </div>
-          </form>
-
-          <div class="discovery-results" id="discoveryResults" style="margin-top: 24px;">
-            <div class="empty-state">Enter a GitHub repository above to discover and analyze commit activity.</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 3: REVIEW & DRAFTS -->
-      <section class="tab-content" id="tab-linkedin-drafts">
-        <div class="panel">
-          <div class="section-header" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start;">
-            <div>
-              <h2>Drafts & Review Queue</h2>
-              <span class="panel-desc">Inspect verification claims, review slop guard scores, edit and approve drafts for publishing</span>
-            </div>
-            <button class="btn btn-secondary btn-xs" id="btnRefreshDrafts" title="Reload drafts">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
-              </svg>
-              Refresh
-            </button>
-          </div>
-
-          <div class="drafts-toolbar" style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
-            <div class="filter-pills" id="draftFilterPills">
-              <button class="filter-btn active" data-filter="">All</button>
-              <button class="filter-btn" data-filter="REVIEW_REQUIRED">Review Required</button>
-              <button class="filter-btn" data-filter="APPROVED">Approved</button>
-              <button class="filter-btn" data-filter="SCHEDULED">Scheduled</button>
-              <button class="filter-btn" data-filter="PUBLISHED">Published</button>
-            </div>
-            <input type="text" id="draftSearchInput" placeholder="Filter drafts by keyword..." style="max-width: 240px; padding: 6px 12px; font-size: 12px;" />
-          </div>
-
-          <div class="drafts-list" id="draftsList">
-            <div class="empty-state">Loading drafts...</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 4: QUEUE & HISTORY -->
-      <section class="tab-content" id="tab-linkedin-queue">
-        <div class="layout-columns">
-          <!-- Scheduled Queue -->
+        <!-- ─────────────────────────────────────────────────────────
+             TAB 3: REVIEW & DRAFTS
+             ───────────────────────────────────────────────────────── -->
+        <section class="tab-content" id="tab-linkedin-drafts">
           <div class="panel">
-            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
               <div>
-                <h2>Scheduled Publishing Queue</h2>
-                <span class="panel-desc">Posts scheduled for automated dispatch</span>
+                <h2>Drafts & Review Queue</h2>
+                <span class="panel-desc">Inspect verification claims, review slop guard scores, edit and approve drafts for publishing</span>
               </div>
-              <button class="btn btn-secondary btn-xs" id="btnRefreshQueue" title="Reload queue">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <button class="btn btn-secondary btn-xs" id="btnRefreshDrafts" title="Reload drafts">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
                 </svg>
                 Refresh
               </button>
             </div>
-            <div id="scheduledList" class="queue-list">
-              <div class="empty-state">No scheduled posts in queue.</div>
+
+            <div class="drafts-toolbar" style="display: flex; gap: 12px; margin-bottom: 14px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+              <div class="filter-pills" id="draftFilterPills">
+                <button class="filter-btn active" data-filter="">All</button>
+                <button class="filter-btn" data-filter="REVIEW_REQUIRED">Review Required</button>
+                <button class="filter-btn" data-filter="APPROVED">Approved</button>
+                <button class="filter-btn" data-filter="SCHEDULED">Scheduled</button>
+                <button class="filter-btn" data-filter="PUBLISHED">Published</button>
+              </div>
+              <input type="text" id="draftSearchInput" placeholder="Filter drafts by keyword..." style="max-width: 240px;" />
+            </div>
+
+            <div class="drafts-list" id="draftsList">
+              <div class="empty-state">Loading drafts...</div>
             </div>
           </div>
+        </section>
 
-          <!-- Published History -->
-          <div class="panel">
+        <!-- ─────────────────────────────────────────────────────────
+             TAB 4: QUEUE & HISTORY
+             ───────────────────────────────────────────────────────── -->
+        <section class="tab-content" id="tab-linkedin-queue">
+          <div class="composer-grid">
+            <!-- Scheduled Queue -->
+            <div class="panel">
+              <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <h2>Scheduled Publishing Queue</h2>
+                  <span class="panel-desc">Posts queued for automated dispatch</span>
+                </div>
+                <button class="btn btn-secondary btn-xs" id="btnRefreshQueue" title="Reload queue">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+              <div id="scheduledList" class="queue-list">
+                <div class="empty-state">No scheduled posts in queue.</div>
+              </div>
+            </div>
+
+            <!-- Published History -->
+            <div class="panel">
+              <div class="panel-header">
+                <h2>Published Posts History</h2>
+                <span class="panel-desc">Live LinkedIn updates dispatched via LinkedIn</span>
+              </div>
+              <div id="publishedList" class="queue-list">
+                <div class="empty-state">No published posts recorded yet.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ─────────────────────────────────────────────────────────
+             TAB 5: AUTOMATION SETTINGS
+             ───────────────────────────────────────────────────────── -->
+        <section class="tab-content" id="tab-linkedin-settings">
+          <div class="panel" style="max-width: 680px;">
             <div class="panel-header">
-              <h2>Published Posts History</h2>
-              <span class="panel-desc">Live LinkedIn updates published via LinkedCtl</span>
+              <h2>Automation & Scheduling Settings</h2>
+              <span class="panel-desc">Configure worker modes, schedule frequency, and slop safety guardrails</span>
             </div>
-            <div id="publishedList" class="queue-list">
-              <div class="empty-state">No published posts recorded yet.</div>
+
+            <form id="liSettingsForm" class="form-body" style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                <label for="settingMode">Automation Mode</label>
+                <select id="settingMode">
+                  <option value="safe" selected>Safe Mode (Drafts require manual user approval before publishing)</option>
+                  <option value="semi">Semi-Autonomous (Auto-publishes drafts scoring above threshold)</option>
+                  <option value="full">Full Autonomous (Continuous autonomous discovery and scheduled publishing)</option>
+                </select>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label for="settingLookback">Lookback Period (Days)</label>
+                  <input type="number" id="settingLookback" min="1" max="30" value="7" />
+                </div>
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label for="settingScoreThreshold">Score Threshold (0 - 100)</label>
+                  <input type="number" id="settingScoreThreshold" min="0" max="100" value="60" />
+                </div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label for="settingMaxWords">Max Words per Post</label>
+                  <input type="number" id="settingMaxWords" min="50" max="500" value="250" />
+                </div>
+                <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+                  <label for="settingApprovalWindow">Approval Window (Hours)</label>
+                  <input type="number" id="settingApprovalWindow" min="1" max="72" value="24" />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" id="settingIncludeHashtags" checked style="width: auto;" />
+                  <span>Automatically include relevant hashtags</span>
+                </label>
+              </div>
+
+              <button type="submit" class="btn btn-primary" id="btnSaveSettings" style="align-self: flex-start;">
+                Save Automation Settings
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <!-- ─────────────────────────────────────────────────────────
+             TAB 6: SYSTEM LOGS
+             ───────────────────────────────────────────────────────── -->
+        <section class="tab-content" id="tab-linkedin-logs">
+          <div class="panel">
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <h2>System & Execution Logs</h2>
+                <span class="panel-desc">Real-time SSE event stream and pipeline diagnostics</span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button class="btn btn-ghost btn-xs" id="btnClearLogs">Clear</button>
+                <button class="btn btn-secondary btn-xs" id="btnCopyLogs">Copy</button>
+              </div>
+            </div>
+            <div class="terminal-panel">
+              <div class="terminal-body" id="terminalLogs">
+                <div class="log-line info"><span class="log-tag">[SYSTEM]</span> LinkedIn Studio initialized and online.</div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <!-- TAB 5: AUTOMATION SETTINGS -->
-      <section class="tab-content" id="tab-linkedin-settings">
-        <div class="panel" style="max-width: 700px;">
-          <div class="panel-header">
-            <h2>Automation & Scheduling Settings</h2>
-            <span class="panel-desc">Configure worker modes, schedule frequency, and slop safety guardrails</span>
-          </div>
-
-          <form id="liSettingsForm" class="form-body">
-            <div class="form-group">
-              <label for="settingMode">Automation Mode</label>
-              <select id="settingMode">
-                <option value="safe" selected>Safe Mode (Drafts require manual user approval before publishing)</option>
-                <option value="semi">Semi-Autonomous (Auto-publishes drafts scoring above threshold)</option>
-                <option value="full">Full Autonomous (Continuous autonomous discovery and scheduled publishing)</option>
-              </select>
-            </div>
-
-            <div class="form-grid-2">
-              <div class="form-group">
-                <label for="settingLookback">Lookback Period (Days)</label>
-                <input type="number" id="settingLookback" min="1" max="30" value="7" />
-              </div>
-              <div class="form-group">
-                <label for="settingScoreThreshold">Score Threshold (0 - 100)</label>
-                <input type="number" id="settingScoreThreshold" min="0" max="100" value="60" />
-              </div>
-            </div>
-
-            <div class="form-grid-2">
-              <div class="form-group">
-                <label for="settingMaxWords">Max Words per Post</label>
-                <input type="number" id="settingMaxWords" min="50" max="500" value="250" />
-              </div>
-              <div class="form-group">
-                <label for="settingApprovalWindow">Approval Window (Hours)</label>
-                <input type="number" id="settingApprovalWindow" min="1" max="72" value="24" />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                <input type="checkbox" id="settingIncludeHashtags" checked style="width: auto;" />
-                <span>Automatically include relevant hashtags</span>
-              </label>
-            </div>
-
-            <button type="submit" class="btn btn-primary" id="btnSaveSettings">
-              Save Automation Settings
-            </button>
-          </form>
-        </div>
-      </section>
-
-      <!-- TAB 6: SYSTEM LOGS -->
-      <section class="tab-content" id="tab-linkedin-logs">
-        <div class="panel-section">
-          <div class="section-header">
-            <h3>Execution & System Logs</h3>
-            <div class="terminal-controls">
-              <button class="btn btn-ghost btn-xs" id="btnClearLogs">Clear</button>
-              <button class="btn btn-ghost btn-xs" id="btnCopyLogs">Copy</button>
-            </div>
-          </div>
-          <div class="terminal-panel">
-            <div class="terminal-body" id="terminalLogs">
-              <div class="log-line info"><span class="log-tag">[SYSTEM]</span> LinkedCtl Studio initialized and online.</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
     </main>
   </div>
 
-  <!-- Global Image Lightbox Modal for Full Size Previews -->
+  <!-- ─────────────────────────────────────────────────────────────
+       MODALS & LIGHTBOX
+       ───────────────────────────────────────────────────────────── -->
+  <!-- Global Image Lightbox Modal -->
   <div id="imageLightboxModal" class="lightbox-modal" style="display: none;">
     <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
     <div class="lightbox-content">
@@ -533,17 +629,16 @@
         <h3 id="editModalTitle">Edit Draft</h3>
         <button type="button" class="btn btn-ghost btn-xs modal-close-btn" id="btnEditModalClose">&times;</button>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-            <label for="editDraftText">Post Caption</label>
-            <div style="display: flex; gap: 8px;">
-              <span class="char-count" id="editModalWordCount">0 words</span>
-              <span class="char-count" id="editModalCharCount">0 / 3,000</span>
-            </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+          <label for="editDraftText">Post Caption</label>
+          <div style="display: flex; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+            <span id="editModalWordCount">0 words</span>
+            <span>•</span>
+            <span id="editModalCharCount">0 / 3,000</span>
           </div>
-          <textarea id="editDraftText" rows="9" style="min-height: 180px;"></textarea>
         </div>
+        <textarea id="editDraftText" rows="9" style="min-height: 180px;"></textarea>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" id="btnEditModalCancel">Cancel</button>

@@ -1,5 +1,6 @@
 import path from 'path';
 import dotenv from 'dotenv';
+import { validateStudioEnv } from './env-schema';
 
 dotenv.config();
 
@@ -29,30 +30,46 @@ export interface AppConfig {
   ffmpegEncoder: FFmpegEncoder;
   audioNormalization: boolean;
   port: number;
+  dryRun: boolean;
 }
 
-export const defaultConfig: AppConfig = {
-  llmProvider: (process.env.LLM_PROVIDER as LLMProvider) || 'auto',
-  llmApiKey: process.env.LLM_API_KEY || process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.GEMINI_API_KEY || '',
-  groqApiKey: process.env.GROQ_API_KEY || '',
-  openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
-  geminiApiKey: process.env.GEMINI_API_KEY || '',
-  llmModel: process.env.LLM_MODEL || 'llama-3.3-70b-versatile',
-  groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-  openrouterModel: process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-ultra-550b-a55b:free',
-  llmBaseUrl: process.env.LLM_BASE_URL,
-  flowAgentApiUrl: process.env.FLOW_AGENT_API_URL || 'http://127.0.0.1:8001',
-  outputFolder: process.env.OUTPUT_FOLDER || path.resolve(process.cwd(), 'projects'),
-  outputResolution: process.env.OUTPUT_RESOLUTION || '1080p',
-  aspectRatio: (process.env.ASPECT_RATIO as AspectRatio) || 'landscape',
-  parallelGenerations: parseInt(process.env.PARALLEL_GENERATIONS || '1', 10),
-  retryCount: parseInt(process.env.RETRY_COUNT || '3', 10),
-  transitionDuration: parseFloat(process.env.TRANSITION_DURATION || '0.5'),
-  defaultTransition: (process.env.DEFAULT_TRANSITION as TransitionType) || 'crossfade',
-  ffmpegEncoder: (process.env.FFMPEG_ENCODER as FFmpegEncoder) || 'libx264',
-  audioNormalization: process.env.AUDIO_NORMALIZATION !== 'false',
-  port: parseInt(process.env.PORT || '3000', 10),
-};
+function resolveDefaultConfig(): AppConfig {
+  const validated = validateStudioEnv(process.env);
+  const resolvedOutputFolder = path.isAbsolute(validated.OUTPUT_FOLDER)
+    ? validated.OUTPUT_FOLDER
+    : path.resolve(process.cwd(), validated.OUTPUT_FOLDER);
+
+  return {
+    llmProvider: validated.LLM_PROVIDER,
+    llmApiKey:
+      validated.LLM_API_KEY ||
+      validated.GROQ_API_KEY ||
+      validated.OPENROUTER_API_KEY ||
+      validated.GEMINI_API_KEY ||
+      '',
+    groqApiKey: validated.GROQ_API_KEY,
+    openrouterApiKey: validated.OPENROUTER_API_KEY,
+    geminiApiKey: validated.GEMINI_API_KEY,
+    llmModel: validated.LLM_MODEL,
+    groqModel: validated.GROQ_MODEL,
+    openrouterModel: validated.OPENROUTER_MODEL,
+    llmBaseUrl: validated.LLM_BASE_URL || undefined,
+    flowAgentApiUrl: validated.FLOW_AGENT_API_URL,
+    outputFolder: resolvedOutputFolder,
+    outputResolution: validated.OUTPUT_RESOLUTION,
+    aspectRatio: validated.ASPECT_RATIO,
+    parallelGenerations: validated.PARALLEL_GENERATIONS,
+    retryCount: validated.RETRY_COUNT,
+    transitionDuration: validated.TRANSITION_DURATION,
+    defaultTransition: validated.DEFAULT_TRANSITION,
+    ffmpegEncoder: validated.FFMPEG_ENCODER,
+    audioNormalization: validated.AUDIO_NORMALIZATION,
+    port: validated.PORT,
+    dryRun: validated.DRY_RUN,
+  };
+}
+
+export const defaultConfig: AppConfig = resolveDefaultConfig();
 
 export class ConfigService {
   private config: AppConfig;

@@ -20,7 +20,62 @@ export interface GeneratedVisualResult {
   error: string | undefined;
   /** The prompt that was used for generation. */
   prompt: string;
+  /** Whether the prompt was automatically sanitized to comply with safety filters. */
+  sanitized?: boolean | undefined;
+  /** The sanitized prompt used if safety rewrite was applied. */
+  sanitizedPrompt?: string | undefined;
 }
+
+/**
+ * Terms that commonly trip cloud image generation safety filters (e.g. Google Imagen).
+ * Mapped to professional, neutral architectural design concepts.
+ */
+const UNSAFE_WORD_REPLACEMENTS: ReadonlyArray<[RegExp, string]> = [
+  [/\b(kill(?:ing|ed|s)?|murder(?:ed|ing|s)?|die|death|destroy(?:ed|ing|s)?)\b/gi, "terminate and clean up"],
+  [/\b(attack(?:ing|ed|er|ers|s)?|exploit(?:ed|ing|s)?|breach(?:ed|ing|s)?)\b/gi, "traffic surge analysis"],
+  [/\b(hack(?:ing|ed|er|ers|s)?)\b/gi, "deep system inspection"],
+  [/\b(crash(?:ed|ing|es)?|fatal(?:ity)?)\b/gi, "unhandled exception recovery"],
+  [/\b(deadlock(?:ed|ing|s)?)\b/gi, "concurrency synchronization barrier"],
+  [/\b(poison(?:\s*pill)?)\b/gi, "sentinel queue marker"],
+  [/\b(zombie(?:s)?)\b/gi, "orphaned background task"],
+  [/\b(penetrat(?:ion|ing|e))\b/gi, "automated security audit"],
+  [/\b(weapon(?:s)?|gun(?:s)?|bullet(?:s)?|knife|knives)\b/gi, "hardware diagnostic tool"],
+  [/\b(hijack(?:ed|ing|s)?|steal(?:ing|s)?|stolen)\b/gi, "unauthorized connection intercept"],
+  [/\b(blood|gore|violent|violence)\b/gi, "high intensity activity"],
+  [/\b(nude|naked|nsfw|sex(?:ual)?)\b/gi, "minimalist aesthetic"],
+];
+
+/**
+ * Clean and transform prompts to avoid triggering strict cloud safety filters.
+ */
+export function sanitizeVisualPrompt(prompt: string): string {
+  let cleaned = prompt;
+  for (const [regex, replacement] of UNSAFE_WORD_REPLACEMENTS) {
+    cleaned = cleaned.replace(regex, replacement);
+  }
+
+  // If the prompt is overly long (e.g. an entire raw post text), extract core technical terms
+  if (cleaned.length > 250) {
+    cleaned = cleaned.slice(0, 240);
+  }
+
+  // Ensure professional, abstract engineering aesthetic
+  if (
+    !cleaned.toLowerCase().includes("diagram") &&
+    !cleaned.toLowerCase().includes("illustration") &&
+    !cleaned.toLowerCase().includes("minimal")
+  ) {
+    cleaned = `${cleaned}, clean modern isometric 3D technical architecture diagram, subtle glowing nodes, sleek dark background, developer documentation aesthetic, no text`;
+  }
+
+  return cleaned.trim();
+}
+
+/**
+ * Universal safe fallback prompt when all else fails safety filters.
+ */
+export const SAFE_FALLBACK_PROMPT =
+  "Minimalist modern software architecture diagram, glowing modular server nodes, abstract data flow pathways, deep slate dark background, elegant technical editorial illustration, high resolution 8k, no text";
 
 /**
  * Directory for temporary generated images.
@@ -38,16 +93,7 @@ async function ensureOutputDir(): Promise<string> {
 
 /**
  * Generate an image via Flow Agent and download it to a local file.
- *
- * Steps:
- * 1. Check Flow Agent health
- * 2. Request image generation
- * 3. Download the generated image from the returned URL
- * 4. Save to a local temp file
- * 5. Return the file path
- *
- * On any failure, returns a result with success=false and an error message
- * instead of throwing, so the post pipeline can continue without an image.
+ * Automatically recovers from safety filter rejections (PUBLIC_ERROR_UNSAFE_GENERATION).
  */
 export async function generateVisual(
   prompt: string,
@@ -91,30 +137,98 @@ export async function generateVisual(
     };
   }
 
-  // Step 2: Generate image
+  // Step 2: Generate image with safety filter fallback & auto-retry
   let images;
+  let finalPrompt = trimmedPrompt;
+  let wasSanitized = false;
+
   try {
     images = await client.generateImage({
-      prompt: trimmedPrompt,
+      prompt: finalPrompt,
       aspect: options?.aspect ?? "landscape",
       count: 1,
     });
   } catch (error: unknown) {
-    const message = error instanceof FlowAgentError ? error.message : "Unknown generation error";
-    return {
-      success: false,
-      imagePath: undefined,
-      error: `Image generation failed: ${message}`,
-      prompt,
-    };
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    const isSafetyError =
+      errorMsg.includes("UNSAFE_GENERATION") ||
+      errorMsg.includes("invalid argument") ||
+      errorMsg.includes("safety") ||
+      errorMsg.includes("400");
+
+    if (isSafetyError) {
+      // Attempt 1: Retry with sanitized prompt
+      const sanitized = sanitizeVisualPrompt(trimmedPrompt);
+      if (sanitized !== trimmedPrompt) {
+        try {
+          finalPrompt = sanitized;
+          wasSanitized = true;
+          images = await client.generateImage({
+            prompt: finalPrompt,
+            aspect: options?.aspect ?? "landscape",
+            count: 1,
+          });
+        } catch {
+          // Attempt 2: Universal safe architectural illustration
+          try {
+            finalPrompt = SAFE_FALLBACK_PROMPT;
+            wasSanitized = true;
+            images = await client.generateImage({
+              prompt: finalPrompt,
+              aspect: options?.aspect ?? "landscape",
+              count: 1,
+            });
+          } catch (fallbackError: unknown) {
+            const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            return {
+              success: false,
+              imagePath: undefined,
+              error: `Image generation safety filter: Google Flow rejected the prompt (${fallbackMsg}). Please use an abstract architecture diagram prompt.`,
+              prompt: finalPrompt,
+              sanitized: true,
+              sanitizedPrompt: finalPrompt,
+            };
+          }
+        }
+      } else {
+        // Directly try universal safe prompt
+        try {
+          finalPrompt = SAFE_FALLBACK_PROMPT;
+          wasSanitized = true;
+          images = await client.generateImage({
+            prompt: finalPrompt,
+            aspect: options?.aspect ?? "landscape",
+            count: 1,
+          });
+        } catch (fallbackError: unknown) {
+          const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+          return {
+            success: false,
+            imagePath: undefined,
+            error: `Image generation safety filter: Google Flow rejected the prompt (${fallbackMsg}). Please use an abstract architecture diagram prompt.`,
+            prompt: finalPrompt,
+            sanitized: true,
+            sanitizedPrompt: finalPrompt,
+          };
+        }
+      }
+    } else {
+      const message = error instanceof FlowAgentError ? error.message : "Unknown generation error";
+      return {
+        success: false,
+        imagePath: undefined,
+        error: `Image generation failed: ${message}`,
+        prompt: finalPrompt,
+      };
+    }
   }
 
-  if (images.length === 0) {
+  if (!images || images.length === 0) {
     return {
       success: false,
       imagePath: undefined,
       error: "Flow Agent returned no images",
-      prompt,
+      prompt: finalPrompt,
     };
   }
 
@@ -124,7 +238,7 @@ export async function generateVisual(
       success: false,
       imagePath: undefined,
       error: "Flow Agent returned image without a URL",
-      prompt,
+      prompt: finalPrompt,
     };
   }
 
@@ -138,7 +252,7 @@ export async function generateVisual(
       success: false,
       imagePath: undefined,
       error: `Image download failed: ${message}`,
-      prompt,
+      prompt: finalPrompt,
     };
   }
 
@@ -146,7 +260,9 @@ export async function generateVisual(
     success: true,
     imagePath: localPath,
     error: undefined,
-    prompt,
+    prompt: finalPrompt,
+    sanitized: wasSanitized,
+    sanitizedPrompt: wasSanitized ? finalPrompt : undefined,
   };
 }
 

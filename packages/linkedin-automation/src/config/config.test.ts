@@ -60,7 +60,14 @@ describe("loadConfig", () => {
   });
 
   it("accepts HTTPS URLs", () => {
-    const config = loadConfig({ FLOW_AGENT_URL: "https://flow.example.com:8001" });
-    expect(config.flowAgentUrl).toBe("https://flow.example.com:8001");
+    const config = loadConfig({ FLOW_AGENT_URL: "https://secure-host:8001" });
+    expect(config.flowAgentUrl).toBe("https://secure-host:8001");
+  });
+
+  it("parses DRY_RUN flag correctly", () => {
+    expect(loadConfig({ DRY_RUN: "true" }).dryRun).toBe(true);
+    expect(loadConfig({ DRY_RUN: "1" }).dryRun).toBe(true);
+    expect(loadConfig({ DRY_RUN: "false" }).dryRun).toBe(false);
+    expect(loadConfig({}).dryRun).toBe(false);
   });
 });

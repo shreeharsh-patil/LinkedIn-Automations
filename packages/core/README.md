@@ -1,6 +1,6 @@
 # @linkedctl/core
 
-Core library for LinkedIn API integration -- OAuth 2.0, HTTP client, and service layer used by [`linkedctl`](https://github.com/alexey-pelykh/linkedctl).
+Core library for LinkedIn API integration -- OAuth 2.0, HTTP client, and service layer used by [`linkedctl`](https://github.com/shreeharsh-patil/LinkedIn-Automations).
 
 ## Installation
 
@@ -43,4 +43,4 @@ Requires Node.js >= 24.
 
 **Using `@linkedctl/core` as a library in your project**: Your combined work must be licensed under AGPL-3.0 (or a compatible license).
 
-See the [main project](https://github.com/alexey-pelykh/linkedctl) for full documentation.
+See the [main project](https://github.com/shreeharsh-patil/LinkedIn-Automations) for full documentation.

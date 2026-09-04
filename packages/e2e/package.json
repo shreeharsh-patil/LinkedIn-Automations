@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "license": "AGPL-3.0-only",
-  "author": "Alexey Pelykh (https://github.com/alexey-pelykh)",
+  "author": "shreeharsh-patil (https://github.com/shreeharsh-patil)",
   "scripts": {
     "clean": "rm -rf dist tsconfig.tsbuildinfo",
     "build": "tsc",

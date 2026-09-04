@@ -485,7 +485,7 @@ Environment:
   GITHUB_TOKEN          GitHub personal access token (optional, for private repos)
 
 Examples:
-  linkedin-auto discover alexey-pelykh/linkedctl
+  linkedin-auto discover shreeharsh-patil/LinkedIn-Automations
   linkedin-auto discover --repo owner/repo --days 14
   linkedin-auto discover owner/repo --threshold 3`);
 }
@@ -509,7 +509,7 @@ async function runDiscover(argv: string[]): Promise<void> {
 
   const repoParts = args.repo.split("/");
   if (repoParts.length !== 2 || repoParts[0] === "" || repoParts[1] === "") {
-    console.error("Error: Repository must be in owner/repo format (e.g. alexey-pelykh/linkedctl)");
+    console.error("Error: Repository must be in owner/repo format (e.g. shreeharsh-patil/LinkedIn-Automations)");
     process.exit(2);
   }
 
@@ -651,7 +651,7 @@ Environment:
   GITHUB_TOKEN          GitHub personal access token (optional, for private repos)
 
 Examples:
-  linkedin-auto prepare alexey-pelykh/linkedctl
+  linkedin-auto prepare shreeharsh-patil/LinkedIn-Automations
   linkedin-auto prepare owner/repo --days 14 --threshold 3`);
 }
 
@@ -674,7 +674,7 @@ async function runPrepare(argv: string[]): Promise<void> {
 
   const repoParts = args.repo.split("/");
   if (repoParts.length !== 2 || repoParts[0] === "" || repoParts[1] === "") {
-    console.error("Error: Repository must be in owner/repo format (e.g. alexey-pelykh/linkedctl)");
+    console.error("Error: Repository must be in owner/repo format (e.g. shreeharsh-patil/LinkedIn-Automations)");
     process.exit(2);
   }
 

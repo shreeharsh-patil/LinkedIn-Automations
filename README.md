@@ -1,81 +1,187 @@
-![LinkedCtl: The Complete CLI & MCP for LinkedIn](https://raw.githubusercontent.com/linkedctl/.github/main/profile/assets/social-preview.png)
+# 🚀 LinkedIn Automation & Studio
 
-[![CI](https://img.shields.io/github/check-runs/alexey-pelykh/linkedctl/main)](https://github.com/alexey-pelykh/linkedctl/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/alexey-pelykh/linkedctl/actions/workflows/codeql.yml/badge.svg)](https://github.com/alexey-pelykh/linkedctl/actions/workflows/codeql.yml)
-[![License](https://img.shields.io/github/license/alexey-pelykh/linkedctl)](https://www.gnu.org/licenses/agpl-3.0.txt)
+<p align="center">
+  <strong>The complete developer workspace and autonomous publishing pipeline for LinkedIn</strong>
+</p>
 
-OAuth2 CLI and MCP server for the [LinkedIn](https://www.linkedin.com) API.
+<p align="center">
+  <img src="https://img.shields.io/badge/TypeScript-5.x-007ACC?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Node.js-%3E%3D24-339933?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js" />
+  <img src="https://img.shields.io/badge/Turborepo-2.x-EF4444?style=flat-square&logo=turborepo&logoColor=white" alt="Turborepo" />
+  <img src="https://img.shields.io/badge/Protocol-MCP-8A2BE2?style=flat-square" alt="MCP" />
+  <img src="https://img.shields.io/badge/AI-Google_Flow_%26_Gemini-FF6F00?style=flat-square&logo=google&logoColor=white" alt="AI Engine" />
+  <img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg?style=flat-square" alt="License" />
+</p>
 
-## What It Does
+---
 
-- **Post content** — text, images, video, documents, articles, multi-image carousels, and polls
-- **Comments & reactions** — create, list, and delete comments and reactions on posts
-- **Organization support** — post, comment, react, and view analytics as an organization
-- **Analytics** — per-post, per-member, and per-organization statistics
-- **Media uploads** — upload images, video, and documents to LinkedIn
-- **Draft posts** — save posts as drafts before publishing
-- **OAuth 2.0 authentication** with your own LinkedIn app
-- **Direct token passing** for tokens obtained from other applications
-- **MCP server** for AI assistant integration (Claude, Cursor, etc.)
-- **CLI** for scriptable LinkedIn operations
+## 📖 Overview
 
-## Prerequisites
+**LinkedIn Automation & Studio** is an enterprise-grade developer platform that unifies an **autonomous multi-agent content pipeline**, an **interactive desktop studio**, a **Model Context Protocol (MCP) server**, and a **scriptable command-line interface (CLI)** for the LinkedIn REST API.
 
-- [Node.js](https://nodejs.org) >= 24
-- A [LinkedIn Developer App](https://www.linkedin.com/developers/apps) with appropriate permissions
+Whether you want to automate verified engineering changelogs from GitHub commits, generate architectural visuals via Google Flow, review drafts inside a Linear-grade web UI, or integrate LinkedIn publishing into AI agents (Claude Desktop, Cursor, Windsurf), this platform provides the complete end-to-end tooling.
 
-## Installation
+---
 
-```sh
-npm install -g linkedctl
+## ✨ Key Features
+
+- 🎨 **LinkedIn Studio (Web Dashboard)**: Modern Linear/Raycast-inspired dark UI with a **62% editor / 38% sticky live feed preview**, interactive hashtag chips, editor formatting toolbar, AI draft generator, and media management.
+- 🤖 **Autonomous Multi-Agent Pipeline**:
+    - **Git Activity Scorer**: Mines commits and releases from GitHub repositories.
+    - **Claim Verifier**: Cross-checks facts against raw code changes to eliminate AI hallucinations.
+    - **Slop Guard**: Penalizes marketing fluff, buzzwords, and AI cliches for high-signal engineering commentary.
+- 🖼️ **AI Visual & Diagram Synthesis**: Automated generation of technical diagrams, flowcharts, and editorial graphics via **Google Flow (Imagen 3)** with built-in self-healing prompt safety sanitization and auto-retries.
+- 🔌 **Model Context Protocol (MCP)**: Native MCP server exposing 12+ rich tools for AI assistants (Claude Desktop, Claude Code, Cursor, Windsurf, Cline).
+- 💻 **Complete Developer CLI**: 25+ scriptable commands for posts, polls, carousels, documents, comments, reactions, organization pages, and analytics.
+- 🛡️ **Enterprise Safety & Idempotency**: State tracking via SQLite, duplicate post protection, rate-limit safeguards, and credential encryption.
+
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+graph TD
+    subgraph "1. Ingestion & Discovery"
+        A["GitHub Repositories / Commits / Releases"]
+        B["Local Git Workspaces & Code Diffs"]
+    end
+
+    subgraph "2. Intelligence Engine (@linkedctl/linkedin-automation)"
+        C["Activity Scorer & Change Grouper"]
+        D["Multi-Model LLM Synthesizer (Gemini / Groq / OpenRouter)"]
+        E["Claim Verifier & Anti-Slop Guard"]
+        F["Visual Director & Prompt Sanitizer"]
+    end
+
+    subgraph "3. Visual Engine (Google Flow)"
+        G["Python FastAPI Gateway (Port 8001)"]
+        H["Google Flow / Imagen 3 Bridge"]
+    end
+
+    subgraph "4. Studio Dashboard (@linkedctl/studio)"
+        I["Web UI & Sticky Live Preview (Port 3001)"]
+        J["Review & Approval Queue (SQLite)"]
+        K["Autonomous Dispatcher & Scheduler"]
+    end
+
+    subgraph "5. Publishing Layer"
+        L["LinkedCtl Core SDK (@linkedctl/core)"]
+        M["LinkedCtl CLI (@linkedctl/cli)"]
+        N["Model Context Protocol (@linkedctl/mcp)"]
+        O["Official LinkedIn REST API (v202601)"]
+    end
+
+    A --> C
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F <-->|Generate Diagram| G
+    G <--> H
+    E --> J
+    F --> J
+    J <--> I
+    J --> K
+    K --> L
+    M --> L
+    N --> L
+    L --> O
 ```
 
-Or run directly:
+---
+
+## 🎨 LinkedIn Studio (Web Dashboard)
+
+LinkedCtl includes a local web studio tailored for technical post composition, visual synthesis, and review workflows:
 
 ```sh
-npx linkedctl --help
+# Start LinkedIn Studio server (running on http://localhost:3001)
+pnpm studio
 ```
 
-## Quick Start
+Open [http://localhost:3001](http://localhost:3001) in your browser:
 
-1. Create a LinkedIn app at [linkedin.com/developers](https://www.linkedin.com/developers/apps)
-2. Configure OAuth 2.0 credentials
-3. Authenticate:
-    ```sh
-    linkedctl auth login --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
-    ```
-4. Start using:
-    ```sh
-    linkedctl post "Hello from LinkedCtl!"
-    ```
+| Workspace View       | Description                                                                                                                                                                                                                          |
+| :------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Post Composer**    | Dual-column desktop layout (~62% editor, ~38% sticky preview) matching LinkedIn's desktop feed. Includes text formatting, suggested hashtag chips, AI draft assistant, image aspect ratio generator, and drag-and-drop media upload. |
+| **GitHub Discovery** | Inspect commits, pull requests, and releases across repositories to extract verified technical claims.                                                                                                                               |
+| **Review & Drafts**  | Filterable approval tray (`REVIEW_REQUIRED`, `APPROVED`, `SCHEDULED`, `PUBLISHED`) with live editing and approval controls.                                                                                                          |
+| **Queue & History**  | Chronological timeline of upcoming scheduled releases alongside historical published posts with direct feed links.                                                                                                                   |
+| **Settings & Logs**  | Automation lookback windows, cadence intervals, worker thresholds, and real-time SSE execution logs.                                                                                                                                 |
 
-See the [OAuth Setup Guide](https://github.com/alexey-pelykh/linkedctl/blob/main/docs/oauth-setup.md) for detailed step-by-step instructions.
+---
 
-## 🎨 LinkedCtl Studio (Web Dashboard)
+## ⚡ Quick Start
 
-LinkedCtl includes an interactive web dashboard with a live feed preview mockup, GitHub commit analysis, AI diagram synthesis with Google Flow Agent, and a review queue:
+### Prerequisites
+
+- **[Node.js](https://nodejs.org)** $\ge$ 24
+- **[pnpm](https://pnpm.io)** $\ge$ 9
+- A **[LinkedIn Developer App](https://www.linkedin.com/developers/apps)** with OAuth 2.0 permissions (`w_member_social`, `openid`, `profile`)
+
+### 1. Installation
 
 ```sh
-pnpm studio        # Starts LinkedCtl Studio at http://localhost:3000
+git clone https://github.com/shreeharsh-patil/LinkedIn-Automations.git
+cd LinkedIn-Automations
+pnpm install
+pnpm build
 ```
 
-For complete monorepo topology and package structure, see [ARCHITECTURE.md](ARCHITECTURE.md).
+### 2. Configure Credentials
 
-## MCP Integration
+Create a `.env` file in the project root or configure your LinkedIn profile:
 
-### MCP Client Configuration
+```sh
+# Optional AI synthesis credentials (supports automatic failover)
+GEMINI_API_KEY="your-gemini-api-key"
+GROQ_API_KEY="your-groq-api-key"
+OPENROUTER_API_KEY="your-openrouter-api-key"
 
-<details>
+# LinkedIn API Version
+LINKEDCTL_API_VERSION="202601"
+```
+
+Authenticate with your LinkedIn Developer App:
+
+```sh
+pnpm --filter linkedctl exec linkedctl auth login --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
+```
+
+See the [OAuth Setup Guide](docs/oauth-setup.md) for detailed step-by-step instructions.
+
+### 3. Launch Applications
+
+```sh
+# Launch the interactive Web Studio
+pnpm studio
+
+# Run the CLI
+pnpm --filter linkedctl exec linkedctl --help
+
+# Run all test suites
+pnpm test:all
+```
+
+---
+
+## 🔌 Model Context Protocol (MCP) Integration
+
+LinkedCtl includes a native MCP server (`@linkedctl/mcp`) that enables AI assistants to draft, inspect, and publish to LinkedIn autonomously.
+
+### Client Configuration
+
+<details open>
 <summary><b>Claude Desktop</b></summary>
 
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
+Add to your `claude_desktop_config.json`:
 
 ```json
 {
     "mcpServers": {
         "linkedctl": {
-            "command": "npx",
-            "args": ["linkedctl", "mcp"]
+            "command": "node",
+            "args": ["/absolute/path/to/LinkedIn-Automations/packages/mcp/dist/index.js"]
         }
     }
 }
@@ -87,7 +193,7 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
 <summary><b>Claude Code</b></summary>
 
 ```sh
-claude mcp add linkedctl -- npx linkedctl mcp
+claude mcp add linkedctl -- node /absolute/path/to/LinkedIn-Automations/packages/mcp/dist/index.js
 ```
 
 </details>
@@ -95,14 +201,14 @@ claude mcp add linkedctl -- npx linkedctl mcp
 <details>
 <summary><b>Cursor</b></summary>
 
-Add to `.cursor/mcp.json` in your project root:
+Add to `.cursor/mcp.json`:
 
 ```json
 {
     "mcpServers": {
         "linkedctl": {
-            "command": "npx",
-            "args": ["linkedctl", "mcp"]
+            "command": "node",
+            "args": ["/absolute/path/to/LinkedIn-Automations/packages/mcp/dist/index.js"]
         }
     }
 }
@@ -119,8 +225,8 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 {
     "mcpServers": {
         "linkedctl": {
-            "command": "npx",
-            "args": ["linkedctl", "mcp"]
+            "command": "node",
+            "args": ["/absolute/path/to/LinkedIn-Automations/packages/mcp/dist/index.js"]
         }
     }
 }
@@ -128,399 +234,99 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
 
 </details>
 
-### Available Tools
+### Available MCP Tools
 
-All tools accept an optional `profile` parameter to select a configuration profile.
+| Tool              | Category      | Description                                                                              |
+| :---------------- | :------------ | :--------------------------------------------------------------------------------------- |
+| `whoami`          | Auth          | Get authenticated member's name, email, and vanity profile URL                           |
+| `auth_status`     | Auth          | Inspect active OAuth 2.0 token expiry and scope access                                   |
+| `auth_revoke`     | Auth          | Revoke access tokens server-side and purge local profile credentials                     |
+| `post_create`     | Posts         | Publish or draft text, single/multi-image, video, document, poll, or article posts       |
+| `post_get`        | Posts         | Retrieve a post payload by URN                                                           |
+| `post_list`       | Posts         | List authored posts with pagination and organization filters                             |
+| `post_update`     | Posts         | Modify commentary text on an existing LinkedIn post                                      |
+| `post_delete`     | Posts         | Permanently remove a post by URN                                                         |
+| `comment_create`  | Comments      | Post a comment under any publication (supports organization persona)                     |
+| `comment_list`    | Comments      | Paginate comments on a post                                                              |
+| `reaction_create` | Reactions     | Add reactions (`LIKE`, `PRAISE`, `EMPATHY`, `INTEREST`, `APPRECIATION`, `ENTERTAINMENT`) |
+| `reaction_delete` | Reactions     | Remove an active reaction from a post                                                    |
+| `org_list`        | Organizations | Enumerate organization pages administered by the user                                    |
+| `org_followers`   | Organizations | Fetch live follower counts for an organization                                           |
+| `stats_post`      | Analytics     | Query impressions, reach, engagement rate, reactions, and reshares                       |
+| `stats_me`        | Analytics     | Aggregate lifetime metrics across all author publications                                |
+| `document_upload` | Media         | Upload PDF, DOCX, PPTX presentation decks up to 100 MB                                   |
 
-#### Authentication
+---
 
-| Tool          | Description                                                     |
-| ------------- | --------------------------------------------------------------- |
-| `whoami`      | Show the current user's name, email, and profile picture URL    |
-| `auth_status` | Show authentication status for a profile                        |
-| `auth_revoke` | Revoke the access token server-side and clear local credentials |
+## 💻 CLI Reference
 
-#### Posts
-
-| Tool          | Description                                                                |
-| ------------- | -------------------------------------------------------------------------- |
-| `post_create` | Create a post on LinkedIn with optional media, poll, or article attachment |
-| `post_get`    | Fetch a single post by URN                                                 |
-| `post_list`   | List posts with pagination (supports `as_org` for organization posts)      |
-| `post_update` | Update the commentary text of an existing post                             |
-| `post_delete` | Delete a post by URN                                                       |
-
-`post_create` supports rich content types:
-
-| Parameter                    | Description                                           |
-| ---------------------------- | ----------------------------------------------------- |
-| `text`                       | Post text content (required)                          |
-| `visibility`                 | `PUBLIC` or `CONNECTIONS` (default `PUBLIC`)          |
-| `draft`                      | Save as draft instead of publishing                   |
-| `image` / `image_file`       | Attach a single image (URN or local file path)        |
-| `video` / `video_file`       | Attach a video (URN or local file path)               |
-| `document` / `document_file` | Attach a document (URN or local file path)            |
-| `images` / `image_files`     | Attach multiple images (minimum 2)                    |
-| `article_url`                | Attach an article link                                |
-| `poll`                       | Poll question text                                    |
-| `poll_options`               | Poll answer options (2–4 required when `poll` is set) |
-| `poll_duration`              | `ONE_DAY`, `THREE_DAYS`, `ONE_WEEK`, or `TWO_WEEKS`   |
-| `as_org`                     | Post as an organization (numeric ID)                  |
-
-#### Comments
-
-| Tool             | Description                                    |
-| ---------------- | ---------------------------------------------- |
-| `comment_create` | Create a comment on a post (supports `as_org`) |
-| `comment_list`   | List comments on a post                        |
-| `comment_get`    | Get a specific comment by URN                  |
-| `comment_delete` | Delete a comment by URN                        |
-
-#### Reactions
-
-| Tool              | Description                                                                                                                   |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `reaction_create` | Add a reaction to a post (supports `as_org`). Types: `LIKE`, `PRAISE`, `EMPATHY`, `INTEREST`, `APPRECIATION`, `ENTERTAINMENT` |
-| `reaction_list`   | List reactions on a post                                                                                                      |
-| `reaction_delete` | Remove a reaction from a post (supports `as_org`)                                                                             |
-
-#### Organizations
-
-| Tool            | Description                                           |
-| --------------- | ----------------------------------------------------- |
-| `org_list`      | List organizations the authenticated user administers |
-| `org_get`       | Fetch a single organization by ID                     |
-| `org_followers` | Get the follower count for an organization            |
-
-#### Analytics
-
-| Tool         | Description                                                                         |
-| ------------ | ----------------------------------------------------------------------------------- |
-| `stats_post` | Get analytics for a single post (impressions, reach, reactions, comments, reshares) |
-| `stats_me`   | Get aggregated analytics across all your posts                                      |
-| `stats_org`  | Get share statistics for an organization (lifetime or time-bucketed)                |
-
-#### Media
-
-| Tool              | Description                                                           |
-| ----------------- | --------------------------------------------------------------------- |
-| `document_upload` | Upload a document to LinkedIn (PDF, DOCX, PPTX, DOC, PPT; max 100 MB) |
-
-## Configuration
-
-### Config File Format
-
-LinkedCtl stores configuration in YAML files. Each file represents a single profile:
-
-```yaml
-api-version: "202601"
-oauth:
-    client-id: "YOUR_CLIENT_ID"
-    client-secret: "YOUR_CLIENT_SECRET"
-    access-token: "YOUR_ACCESS_TOKEN"
-    refresh-token: "YOUR_REFRESH_TOKEN"
-    token-expires-at: "2026-05-03T12:00:00.000Z"
-```
-
-**Available keys:**
-
-| Key                      | Description                           |
-| ------------------------ | ------------------------------------- |
-| `api-version`            | LinkedIn API version (e.g. `202601`)  |
-| `oauth.client-id`        | OAuth 2.0 client ID                   |
-| `oauth.client-secret`    | OAuth 2.0 client secret               |
-| `oauth.access-token`     | OAuth 2.0 access token                |
-| `oauth.refresh-token`    | OAuth 2.0 refresh token               |
-| `oauth.token-expires-at` | Token expiration timestamp (ISO 8601) |
-
-Config files are written with `0600` permissions (owner read/write only).
-
-### File Location and Precedence
-
-Without a profile, LinkedCtl searches for config files in this order:
-
-1. `.linkedctl.yaml` in the current working directory
-2. `~/.linkedctl.yaml` in the home directory
-
-The first file found is used. When writing (e.g. after `auth login`), LinkedCtl writes to the CWD file if it exists, otherwise to the home directory file.
-
-### Profiles
-
-Profiles let you manage multiple LinkedIn accounts or configurations. Each profile is stored as a separate YAML file under `~/.linkedctl/`:
-
-| Profile    | Config file path             |
-| ---------- | ---------------------------- |
-| (default)  | `~/.linkedctl.yaml`          |
-| `work`     | `~/.linkedctl/work.yaml`     |
-| `personal` | `~/.linkedctl/personal.yaml` |
-
-Use the `--profile` flag with any command:
+LinkedCtl offers an intuitive, scriptable command-line interface.
 
 ```sh
-linkedctl --profile work auth login --client-id ID --client-secret SECRET
+# Shorthand text post
+linkedctl post "Excited to share our new open source release!"
+
+# Post with attached diagram and custom visibility
+linkedctl post create \
+  --text "Architecture breakdown of our high-throughput queue" \
+  --image-file ./architecture.png \
+  --visibility PUBLIC
+
+# Create an interactive poll
+linkedctl post create \
+  --text "Which runtime do you deploy Node.js microservices on?" \
+  --poll "Primary runtime in 2026?" \
+  --option "Node.js (LTS)" \
+  --option "Bun" \
+  --option "Deno" \
+  --poll-duration ONE_WEEK
+
+# Upload a slide deck / document
+linkedctl media upload-document ./whitepaper.pdf --title "Systems Whitepaper"
+
+# View lifetime analytics in JSON or table
+linkedctl stats me --format table
+
+# Manage multiple accounts with profiles
+linkedctl profile create work --access-token YOUR_TOKEN --api-version 202601
 linkedctl --profile work post "Hello from my work account!"
 ```
 
-Manage profiles with the `profile` command:
+---
 
-```sh
-linkedctl profile create work --access-token YOUR_TOKEN --api-version 202601
-linkedctl profile list
-linkedctl profile show work
-linkedctl profile delete work
-```
+## 📦 Monorepo Packages
 
-### Authentication Methods
+| Package                              | Path                                                            | Description                                                                           |
+| :----------------------------------- | :-------------------------------------------------------------- | :------------------------------------------------------------------------------------ |
+| **`@linkedctl/studio`**              | [`flow-agent-main/`](flow-agent-main)                           | Express web orchestrator, Linear-style Studio UI, and Python Flow image engine bridge |
+| **`@linkedctl/linkedin-automation`** | [`packages/linkedin-automation/`](packages/linkedin-automation) | Git commit analysis, LLM post synthesis, claim verification, and prompt safety engine |
+| **`@linkedctl/core`**                | [`packages/core/`](packages/core)                               | Low-level LinkedIn REST API client, OAuth2 PKCE handshake, and token storage          |
+| **`@linkedctl/cli`**                 | [`packages/cli/`](packages/cli)                                 | CLI commands, argument parsers, formatters, and terminal outputs                      |
+| **`@linkedctl/mcp`**                 | [`packages/mcp/`](packages/mcp)                                 | Model Context Protocol server exposing LinkedIn tools to AI assistants                |
+| **`@linkedctl/e2e`**                 | [`packages/e2e/`](packages/e2e)                                 | Automated end-to-end integration and lifecycle verification test suite                |
+| **`linkedctl`**                      | [`packages/linkedctl/`](packages/linkedctl)                     | Umbrella distribution package combining the CLI and MCP runtime                       |
 
-#### OAuth 2.0 (Recommended)
+---
 
-LinkedCtl supports OAuth 2.0 with your own LinkedIn Developer App:
+## 🛡️ Security, Privacy & Safety
 
-```sh
-linkedctl auth login --client-id YOUR_CLIENT_ID --client-secret YOUR_CLIENT_SECRET
-```
+- **Zero-Credential Exposure**: Access tokens, refresh tokens, and client secrets are never logged to console or stdout.
+- **Self-Healing Prompt Safety Sanitizer**: Automatically detects Google Imagen / Flow content safety restrictions (e.g. engineering terms like `kill`, `deadlock`, `exploit`, `poison pill`) and safely reformulates prompts on the fly.
+- **Strict Safe-Mode by Default**: In `SAFE` automation mode, all synthesized content requires explicit human-in-the-loop review before queue insertion.
+- **File System Validation**: Secure path normalization protects media upload endpoints against path traversal attacks.
+- **Destructive Operation Prompts**: Deletion of posts, comments, or authentication profiles mandates interactive confirmation unless explicit `--force` is supplied.
 
-#### Direct Token
+---
 
-If you already have an access token from another application:
+## 📄 License
 
-```sh
-linkedctl auth token --access-token YOUR_TOKEN
-```
+This project is licensed under the [AGPL-3.0 License](LICENSE).
 
-### Environment Variables
+- **Using as a CLI tool or MCP server**: Free to use without copyleft obligations on your content.
+- **Modifying or incorporating core libraries into network services**: Requires distribution of derivative source code under AGPL-3.0.
 
-| Variable                  | Description                                              |
-| ------------------------- | -------------------------------------------------------- |
-| `LINKEDCTL_CLIENT_ID`     | LinkedIn OAuth 2.0 client ID                             |
-| `LINKEDCTL_CLIENT_SECRET` | LinkedIn OAuth 2.0 client secret                         |
-| `LINKEDCTL_ACCESS_TOKEN`  | Direct access token (bypasses OAuth flow)                |
-| `LINKEDCTL_API_VERSION`   | LinkedIn API version string (e.g. `202601`) **required** |
+---
 
-Environment variables take precedence over config file values.
-
-#### Profile-Prefixed Environment Variables
-
-When using a named profile, LinkedCtl also reads profile-prefixed environment variables. The profile name is uppercased with hyphens converted to underscores:
-
-| Profile    | Variable                          |
-| ---------- | --------------------------------- |
-| (default)  | `LINKEDCTL_ACCESS_TOKEN`          |
-| `work`     | `LINKEDCTL_WORK_ACCESS_TOKEN`     |
-| `my-brand` | `LINKEDCTL_MY_BRAND_ACCESS_TOKEN` |
-
-The same pattern applies to `CLIENT_ID`, `CLIENT_SECRET`, and `API_VERSION`.
-
-### Precedence Order
-
-Configuration values are resolved in this order (highest priority first):
-
-1. **Environment variables** (profile-prefixed if a profile is active)
-2. **Config file** (profile-specific file, or CWD/home fallback)
-
-## CLI Reference
-
-### Global Options
-
-| Option             | Description                          |
-| ------------------ | ------------------------------------ |
-| `--profile <name>` | Use a specific configuration profile |
-| `--json`           | Force JSON output                    |
-| `-q, --quiet`      | Suppress informational output        |
-| `--no-color`       | Disable color output                 |
-
-### `auth` — Manage Authentication
-
-| Command        | Description                                                |
-| -------------- | ---------------------------------------------------------- |
-| `auth setup`   | Configure OAuth client credentials interactively           |
-| `auth login`   | Authenticate via OAuth 2.0 (opens browser)                 |
-| `auth token`   | Store a direct access token                                |
-| `auth status`  | Show authentication status and token expiry                |
-| `auth logout`  | Clear stored credentials from the active profile           |
-| `auth refresh` | Refresh the access token using a stored refresh token      |
-| `auth revoke`  | Revoke the access token server-side and clear local tokens |
-
-**`auth login` options:**
-
-| Option                     | Description                        | Default                          |
-| -------------------------- | ---------------------------------- | -------------------------------- |
-| `--client-id <id>`         | OAuth 2.0 client ID                | from config                      |
-| `--client-secret <secret>` | OAuth 2.0 client secret            | from config                      |
-| `--scope <scopes>`         | OAuth 2.0 scopes (space-separated) | `openid profile w_member_social` |
-
-**`auth token` options:**
-
-| Option                   | Description                      |
-| ------------------------ | -------------------------------- |
-| `--access-token <token>` | Access token to store (required) |
-
-### `post` — Manage LinkedIn Posts
-
-```sh
-# Shorthand: pass text as an argument
-linkedctl post "Hello from LinkedCtl!"
-
-# Explicit subcommand
-linkedctl post create --text "Hello from LinkedCtl!"
-
-# Pipe content from stdin
-echo "Hello from LinkedCtl!" | linkedctl post create
-```
-
-| Command             | Description                       |
-| ------------------- | --------------------------------- |
-| `post create`       | Create a post on LinkedIn         |
-| `post get <urn>`    | Fetch a post by URN               |
-| `post list`         | List posts with pagination        |
-| `post update <urn>` | Update a post's commentary text   |
-| `post delete <urn>` | Delete a post (with confirmation) |
-
-**`post create` options:**
-
-| Option                       | Description                                                     | Default      |
-| ---------------------------- | --------------------------------------------------------------- | ------------ |
-| `--text <text>`              | Text content (also accepts `--text-file`, positional, or stdin) |              |
-| `--visibility <visibility>`  | `PUBLIC` or `CONNECTIONS`                                       | `PUBLIC`     |
-| `--draft`                    | Save as draft instead of publishing                             |              |
-| `--image <urn>`              | Image URN to attach                                             |              |
-| `--image-file <path>`        | Local image file to upload and attach                           |              |
-| `--video <urn>`              | Video URN to attach                                             |              |
-| `--video-file <path>`        | Local video file to upload and attach                           |              |
-| `--document <urn>`           | Document URN to attach                                          |              |
-| `--document-file <path>`     | Local document file to upload and attach                        |              |
-| `--images <urns>`            | Multiple image URNs (comma-separated, minimum 2)                |              |
-| `--image-files <paths>`      | Multiple local image files (comma-separated, minimum 2)         |              |
-| `--article-url <url>`        | Article URL to attach                                           |              |
-| `--poll <question>`          | Poll question text                                              |              |
-| `--option <text>`            | Poll option (repeat 2–4 times)                                  |              |
-| `--poll-duration <duration>` | `ONE_DAY`, `THREE_DAYS`, `ONE_WEEK`, or `TWO_WEEKS`             | `THREE_DAYS` |
-| `--as-org <id>`              | Post as an organization (numeric ID)                            |              |
-| `--format <format>`          | Output format (`json`, `table`)                                 | auto         |
-
-**`post list` options:**
-
-| Option          | Description                                | Default |
-| --------------- | ------------------------------------------ | ------- |
-| `--count <n>`   | Number of posts to return (max 100)        | `10`    |
-| `--start <n>`   | Starting index for pagination              | `0`     |
-| `--as-org <id>` | List posts of an organization (numeric ID) |         |
-
-### `comment` — Manage Comments
-
-| Command                        | Description                          |
-| ------------------------------ | ------------------------------------ |
-| `comment create <post-urn>`    | Create a comment on a post           |
-| `comment list <post-urn>`      | List comments on a post              |
-| `comment get <comment-urn>`    | Get a specific comment by URN        |
-| `comment delete <comment-urn>` | Delete a comment (with confirmation) |
-
-**`comment create` options:**
-
-| Option          | Description                             |
-| --------------- | --------------------------------------- |
-| `--text <text>` | Comment text (required)                 |
-| `--as-org <id>` | Comment as an organization (numeric ID) |
-
-### `reaction` — Manage Reactions
-
-| Command                 | Description                   |
-| ----------------------- | ----------------------------- |
-| `reaction create <urn>` | Add a reaction to a post      |
-| `reaction list <urn>`   | List reactions on a post      |
-| `reaction delete <urn>` | Remove a reaction from a post |
-
-**`reaction create` options:**
-
-| Option          | Description                                                                                  |
-| --------------- | -------------------------------------------------------------------------------------------- |
-| `--type <type>` | `LIKE`, `PRAISE`, `EMPATHY`, `INTEREST`, `APPRECIATION`, or `ENTERTAINMENT` (default `LIKE`) |
-| `--as-org <id>` | React as an organization (numeric ID)                                                        |
-
-### `org` — Manage Organizations
-
-| Command              | Description                                           |
-| -------------------- | ----------------------------------------------------- |
-| `org list`           | List organizations the authenticated user administers |
-| `org get <id>`       | Get organization details                              |
-| `org followers <id>` | Get organization follower count                       |
-
-### `media` — Upload Media
-
-| Command                        | Description                                               |
-| ------------------------------ | --------------------------------------------------------- |
-| `media upload-image <file>`    | Upload an image (JPG, PNG, GIF)                           |
-| `media upload-video <file>`    | Upload a video                                            |
-| `media upload-document <file>` | Upload a document (PDF, DOCX, PPTX, DOC, PPT; max 100 MB) |
-
-All media commands accept `--as-org <id>` and `--format json|table`.
-
-### `stats` — View Analytics
-
-| Command            | Description                                         |
-| ------------------ | --------------------------------------------------- |
-| `stats post <urn>` | Get post analytics (impressions, reach, engagement) |
-| `stats me`         | Get aggregated analytics across all your posts      |
-| `stats org <id>`   | Get organization share statistics                   |
-
-**Common options:**
-
-| Option                             | Description                       |
-| ---------------------------------- | --------------------------------- |
-| `--from <date>` / `--start <date>` | Start of date range (YYYY-MM-DD)  |
-| `--to <date>` / `--end <date>`     | End of date range (YYYY-MM-DD)    |
-| `--time-granularity <granularity>` | `DAY` or `MONTH` (org stats only) |
-
-### `profile` — Manage Configuration Profiles
-
-| Command                 | Description                          |
-| ----------------------- | ------------------------------------ |
-| `profile create <name>` | Create a new profile                 |
-| `profile list`          | List all profiles                    |
-| `profile show [<name>]` | Show profile details (redacted)      |
-| `profile delete <name>` | Delete a profile (with confirmation) |
-
-**`profile create` options:**
-
-| Option                    | Description                                    |
-| ------------------------- | ---------------------------------------------- |
-| `--access-token <token>`  | OAuth 2.0 access token (required)              |
-| `--api-version <version>` | LinkedIn API version, e.g. `202601` (required) |
-
-### `whoami` — Show Current User
-
-```sh
-linkedctl whoami
-linkedctl whoami --format json
-```
-
-| Option              | Description                     | Default |
-| ------------------- | ------------------------------- | ------- |
-| `--format <format>` | Output format (`json`, `table`) | auto    |
-
-### `completion` — Shell Completions
-
-```sh
-linkedctl completion bash
-linkedctl completion zsh
-```
-
-## Security
-
-- **Dependabot** keeps dependencies up to date with automated pull requests
-- **CodeQL** analysis runs on every push and pull request for automated vulnerability detection
-- **Path traversal validation** on profile names prevents directory escape attacks
-- **Unified auth error handling** across all MCP tools provides consistent authentication failure messages
-- **Destructive operations** (delete post, delete comment, delete profile) require interactive confirmation unless `--force` is passed
-
-## Disclaimer
-
-This is an independent project and is not affiliated with, endorsed by, or associated with LinkedIn Corporation. LinkedIn is a trademark of LinkedIn Corporation.
-
-## License
-
-[AGPL-3.0-only](https://www.gnu.org/licenses/agpl-3.0.txt)
-
-**Using LinkedCtl as a CLI tool or MCP server**: No license obligations — use freely.
-
-**Using `@linkedctl/core` as a library in your project**: Your combined work must be licensed under AGPL-3.0 (or a compatible license).
+<p align="center">
+  <sub>Built with ❤️ for software engineers and developer advocates. Not affiliated with or endorsed by LinkedIn Corporation.</sub>
+</p>

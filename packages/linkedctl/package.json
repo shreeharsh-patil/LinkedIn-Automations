@@ -7,13 +7,12 @@
     "node": ">=24"
   },
   "license": "AGPL-3.0-only",
-  "author": "Alexey Pelykh (https://github.com/alexey-pelykh)",
-  "homepage": "https://github.com/alexey-pelykh/linkedctl",
-  "bugs": "https://github.com/alexey-pelykh/linkedctl/issues",
-  "funding": "https://github.com/sponsors/alexey-pelykh",
+  "author": "shreeharsh-patil (https://github.com/shreeharsh-patil)",
+  "homepage": "https://github.com/shreeharsh-patil/LinkedIn-Automations",
+  "bugs": "https://github.com/shreeharsh-patil/LinkedIn-Automations/issues",
   "repository": {
     "type": "git",
-    "url": "https://github.com/alexey-pelykh/linkedctl.git",
+    "url": "https://github.com/shreeharsh-patil/LinkedIn-Automations.git",
     "directory": "packages/linkedctl"
   },
   "exports": {
@@ -25,7 +24,7 @@
   "bin": {
     "linkedctl": "./dist/cli.js"
   },
-  "mcpName": "io.github.alexey-pelykh/linkedctl",
+  "mcpName": "io.github.shreeharsh-patil/LinkedIn-Automations",
   "keywords": [
     "linkedin",
     "social-media",

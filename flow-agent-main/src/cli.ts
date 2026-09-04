@@ -24,7 +24,7 @@ async function main() {
     const port = config.port || 3000;
     app.listen(port, () => {
       logger.success(`=======================================================`);
-      logger.success(`   FLOW MOVIE AGENT PLATFORM IS ONLINE!`);
+      logger.success(`   LINKEDIN AUTOMATION & STUDIO IS ONLINE!`);
       logger.success(`   Web Dashboard UI: http://localhost:${port}`);
       logger.success(`   Flow Agent API Target: ${config.flowAgentApiUrl}`);
       logger.success(`=======================================================`);
@@ -46,8 +46,8 @@ async function main() {
     }
 
     if (!prompt) {
-      logger.error('Error: --prompt is required for generate command.');
-      console.log('\nUsage: npx ts-node src/cli.ts generate --prompt "Cyberpunk detective thriller" --duration 60 --title "Neon Shadows"\n');
+      logger.error('Error: --prompt is required for generation.');
+      console.log('\nUsage: npx ts-node src/cli.ts generate --prompt "Distributed Systems Architecture" --duration 60 --title "Architecture Overview"\n');
       process.exit(1);
     }
 
@@ -97,7 +97,7 @@ async function main() {
     logger.success(`Render completed: ${outputPath}`);
   } else if (command === 'help' || command === '--help' || command === '-h') {
     console.log(`
-Flow Movie Agent — CLI
+LinkedIn Studio & Visual Agent — CLI
 
 Usage:
   npx ts-node src/cli.ts <command> [options]
@@ -116,9 +116,9 @@ Options for 'generate':
 
 Examples:
   npx ts-node src/cli.ts server
-  npx ts-node src/cli.ts generate --prompt "Cyberpunk mystery in Neo Tokyo" --duration 60
+  npx ts-node src/cli.ts generate --prompt "Distributed Systems Architecture" --duration 60
   npx ts-node src/cli.ts list
-  npx ts-node src/cli.ts render cyberpunk-test-1785401771418
+  npx ts-node src/cli.ts render system-test-1785401771418
 `);
   } else {
     console.log(`Unknown command: ${command}`);

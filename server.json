@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.alexey-pelykh/linkedctl",
+  "name": "io.github.shreeharsh-patil/LinkedIn-Automations",
   "description": "CLI and MCP server for the LinkedIn API",
   "repository": {
-    "url": "https://github.com/alexey-pelykh/linkedctl",
+    "url": "https://github.com/shreeharsh-patil/LinkedIn-Automations",
     "source": "github"
   },
   "version": "0.5.0",

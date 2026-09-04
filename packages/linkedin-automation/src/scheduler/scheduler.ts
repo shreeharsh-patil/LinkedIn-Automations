@@ -4,28 +4,31 @@
 /**
  * Poll-based scheduler for automated LinkedIn posting.
  *
- * Uses a polling interval (default: 60 seconds) to check for due posts.
- * No long-running setTimeout chains — each poll cycle is independent.
+ * Uses an atomic job claiming mechanism to ensure that multiple concurrent workers
+ * never publish the same scheduled post.
  *
  * Flow:
- *   1. Poll for due scheduled posts
- *   2. Acquire publish lock
- *   3. Mark PROCESSING
- *   4. Publish via LinkedCtlPublisher
- *   5. Save LinkedIn Post ID
- *   6. Mark PUBLISHED
+ *   1. Atomically claim the next due scheduled post (claimNextScheduledPost)
+ *   2. Lock duration and attempt counts are persisted in storage
+ *   3. Publish via LinkedCtlPublisher (supporting text & image)
+ *   4. Save LinkedIn Post ID/URN & mark PUBLISHED
  *
  * On failure:
- *   - Classify the error
- *   - Retry with bounded exponential backoff (only for retryable failures)
+ *   - Classify the error (rate-limit, transient 5xx, or permanent)
+ *   - Persist attempt counter and last_error in SQLite
+ *   - Retry with bounded exponential backoff only for retryable failures
  *   - Mark FAILED after exhausting retries
  */
 
+import { randomUUID } from "node:crypto";
 import type { StoragePort } from "../storage/storage.js";
 import type { ScheduledPostRecord } from "../storage/types.js";
 import { IdempotentPublisher } from "../storage/idempotent-publisher.js";
 import { classifyFailure } from "./failure-classifier.js";
 import { calculateRetry, sleep, type RetryConfig, DEFAULT_RETRY_CONFIG } from "./retry.js";
+
+/** Default publish lock duration (5 minutes). */
+const DEFAULT_LOCK_DURATION_MS = 5 * 60 * 1000;
 
 /**
  * Scheduler options.
@@ -33,6 +36,8 @@ import { calculateRetry, sleep, type RetryConfig, DEFAULT_RETRY_CONFIG } from ".
 export interface SchedulerOptions {
   /** Polling interval in milliseconds (default: 60000 = 1 minute). */
   pollIntervalMs?: number;
+  /** Lock duration in milliseconds (default: 300000 = 5 minutes). */
+  lockDurationMs?: number;
   /** Retry configuration. */
   retryConfig?: Partial<RetryConfig>;
   /** Abort signal for graceful shutdown. */
@@ -79,16 +84,15 @@ export interface WorkerStats {
 
 /**
  * The main scheduler class.
- *
- * Polls the storage for due scheduled posts and publishes them
- * with retry logic and failure classification.
  */
 export class Scheduler {
   private readonly storage: StoragePort;
   private readonly publisher: IdempotentPublisher;
   private readonly pollIntervalMs: number;
+  private readonly lockDurationMs: number;
   private readonly retryConfig: RetryConfig;
   private readonly onPublish: ((result: PublishAttemptResult) => void) | undefined;
+  private readonly workerId: string;
 
   private abortController: AbortController | undefined;
   private polling = false;
@@ -105,30 +109,20 @@ export class Scheduler {
     this.storage = storage;
     this.publisher = publisher;
     this.pollIntervalMs = options?.pollIntervalMs ?? 60_000;
+    this.lockDurationMs = options?.lockDurationMs ?? DEFAULT_LOCK_DURATION_MS;
     this.retryConfig = { ...DEFAULT_RETRY_CONFIG, ...options?.retryConfig };
     this.onPublish = options?.onPublish;
+    this.workerId = `worker-${randomUUID().slice(0, 8)}`;
   }
 
-  /**
-   * Get current worker statistics.
-   */
   getStats(): WorkerStats {
     return { ...this.stats };
   }
 
-  /**
-   * Check if the worker is currently polling.
-   */
   isRunning(): boolean {
     return this.polling;
   }
 
-  /**
-   * Start the polling loop.
-   *
-   * This runs until the abort signal is triggered or stop() is called.
-   * Each poll cycle is independent — no long-running timers.
-   */
   async start(options?: SchedulerOptions): Promise<void> {
     if (this.polling) {
       return;
@@ -144,11 +138,9 @@ export class Scheduler {
       startedAt: new Date().toISOString(),
     };
 
-    // Use provided signal or create our own
     this.abortController = new AbortController();
     const signal = options?.signal ?? this.abortController.signal;
 
-    // Add abort listener from external signal
     if (options?.signal !== undefined) {
       options.signal.addEventListener(
         "abort",
@@ -164,11 +156,9 @@ export class Scheduler {
         await this.pollCycle();
         this.stats.pollCycles++;
 
-        // Sleep for the poll interval (interruptible)
         try {
           await sleep(this.pollIntervalMs, signal);
         } catch {
-          // AbortError — exit cleanly
           break;
         }
       }
@@ -177,108 +167,72 @@ export class Scheduler {
     }
   }
 
-  /**
-   * Stop the polling loop gracefully.
-   */
   stop(): void {
     this.abortController?.abort();
   }
 
   /**
-   * Run a single poll cycle.
-   *
-   * Checks for due posts and attempts to publish each one.
+   * Run a single poll cycle with atomic job claiming.
    */
   async pollCycle(): Promise<PublishAttemptResult[]> {
     const results: PublishAttemptResult[] = [];
+    const lockId = `${this.workerId}-${randomUUID()}`;
 
-    // Always check for due posts regardless of schedule day/time
-    // The schedule config is used for creating new schedules, not for filtering
-    // existing scheduled posts that are already past their time
-    let duePost = this.storage.getNextScheduledPost();
-    while (duePost !== undefined) {
-      const result = await this.processScheduledPost(duePost);
+    // Atomically claim next due scheduled post (SELECT + lock in single step)
+    let claimedPost = this.storage.claimNextScheduledPost(lockId, this.lockDurationMs);
+
+    while (claimedPost !== undefined) {
+      const result = await this.processClaimedPost(claimedPost, lockId);
       results.push(result);
 
       if (this.onPublish !== undefined) {
         this.onPublish(result);
       }
 
-      // Get next due post
-      duePost = this.storage.getNextScheduledPost();
+      // Check next due post
+      claimedPost = this.storage.claimNextScheduledPost(lockId, this.lockDurationMs);
     }
 
     return results;
   }
 
   /**
-   * Process a single scheduled post with retry logic.
+   * Process an atomically claimed scheduled post with bounded retry logic.
    */
-  private async processScheduledPost(scheduled: ScheduledPostRecord): Promise<PublishAttemptResult> {
+  private async processClaimedPost(scheduled: ScheduledPostRecord, lockId: string): Promise<PublishAttemptResult> {
     this.stats.postsAttempted++;
 
     let lastError: string | undefined;
     let lastCategory: string | undefined;
-    let attempts = 0;
+    let attempts = scheduled.attempts ?? 0;
 
-    // Retry loop
     for (;;) {
       attempts++;
+      this.storage.updateScheduledPostAttempt(scheduled.id, attempts, lastError);
 
-      // Re-fetch the scheduled post (it may have changed)
-      const current = this.storage.getScheduledPost(scheduled.id);
-      if (current === undefined) {
-        // Removed
-        this.stats.postsSkipped++;
+      const draft = this.storage.getDraft(scheduled.draftId);
+      if (draft === undefined) {
+        this.stats.postsFailed++;
+        this.storage.updateScheduledPostState(scheduled.id, "FAILED");
+        this.storage.releasePublishLock(scheduled.id, lockId);
         return {
           scheduledPost: scheduled,
-          success: true,
-          alreadyPublished: true,
-          error: undefined,
-          failureCategory: undefined,
+          success: false,
+          alreadyPublished: false,
+          error: `Draft #${scheduled.draftId} not found`,
+          failureCategory: "VALIDATION_ERROR",
           attempts,
         };
       }
 
-      // If state is not SCHEDULED, check if it was already processed
-      if (current.state !== "SCHEDULED") {
-        if (current.state === "PUBLISHED") {
-          this.stats.postsSkipped++;
-          return {
-            scheduledPost: current,
-            success: true,
-            alreadyPublished: true,
-            error: undefined,
-            failureCategory: undefined,
-            attempts,
-          };
-        }
-        // State is FAILED or PROCESSING — we need to reset to SCHEDULED for retry
-        // (IdempotentPublisher marks FAILED on failure, so we reset it)
-        if (current.state === "FAILED") {
-          this.storage.updateScheduledPostState(current.id, "SCHEDULED");
-          current.state = "SCHEDULED";
-        } else {
-          // PROCESSING or other unexpected state — skip
-          this.stats.postsSkipped++;
-          return {
-            scheduledPost: current,
-            success: false,
-            alreadyPublished: false,
-            error: `Unexpected state: ${current.state}`,
-            failureCategory: undefined,
-            attempts,
-          };
-        }
-      }
-
-      // Attempt to publish
-      const result = await this.publisher.publishScheduledPost(current);
+      const result = await this.publisher.publishDraft(draft);
 
       if (result.success) {
         this.stats.postsPublished++;
-        // Re-fetch to get updated state
-        const updated = this.storage.getScheduledPost(current.id) ?? current;
+        this.storage.updateScheduledPostState(scheduled.id, "PUBLISHED");
+        this.storage.releasePublishLock(scheduled.id, lockId);
+
+        const updated = this.storage.getScheduledPost(scheduled.id) ?? scheduled;
         return {
           scheduledPost: updated,
           success: true,
@@ -289,19 +243,23 @@ export class Scheduler {
         };
       }
 
-      // Classify the failure
+      // Failure handling
       const failure = classifyFailure(result.error);
       lastError = result.error;
       lastCategory = failure.category;
+      this.storage.updateScheduledPostAttempt(scheduled.id, attempts, lastError);
 
       // Check if we should retry
       const decision = calculateRetry(attempts - 1, failure, this.retryConfig);
 
       if (!decision.shouldRetry) {
-        // Exhausted retries or non-retryable
         this.stats.postsFailed++;
+        this.storage.updateScheduledPostState(scheduled.id, "FAILED");
+        this.storage.releasePublishLock(scheduled.id, lockId);
+
+        const updated = this.storage.getScheduledPost(scheduled.id) ?? scheduled;
         return {
-          scheduledPost: current,
+          scheduledPost: updated,
           success: false,
           alreadyPublished: false,
           error: lastError,
@@ -310,14 +268,16 @@ export class Scheduler {
         };
       }
 
-      // Wait before retrying
+      // Wait before next retry attempt
       try {
         await sleep(decision.delayMs, this.abortController?.signal);
       } catch {
-        // AbortError — stop retrying
         this.stats.postsFailed++;
+        this.storage.updateScheduledPostState(scheduled.id, "FAILED");
+        this.storage.releasePublishLock(scheduled.id, lockId);
+
         return {
-          scheduledPost: current,
+          scheduledPost: scheduled,
           success: false,
           alreadyPublished: false,
           error: "Worker stopped during retry backoff",

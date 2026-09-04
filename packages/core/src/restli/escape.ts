@@ -15,7 +15,7 @@
  * The following characters must be backslash-escaped per LinkedIn/Microsoft
  * documentation: `_ | ( ) [ ] { } @ # * ~ < > \`
  *
- * @see https://github.com/alexey-pelykh/linkedctl/issues/194
+ * @see https://learn.microsoft.com/en-us/linkedin/shared/api-guide/concepts/query-formatting
  */
 export function escapeRestliReservedCharacters(text: string): string {
   return text.replace(/[_|()[\]{}<>@#*~\\]/g, (ch) => `\\${ch}`);

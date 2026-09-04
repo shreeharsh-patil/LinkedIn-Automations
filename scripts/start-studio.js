@@ -52,7 +52,7 @@ const child = spawn(`${npmCmd} run ${npmScript}`, {
   shell: true,
   env: {
     ...process.env,
-    PORT: process.env.PORT || '3000',
+    ...(process.env.PORT ? { PORT: process.env.PORT } : {}),
   },
 });
 

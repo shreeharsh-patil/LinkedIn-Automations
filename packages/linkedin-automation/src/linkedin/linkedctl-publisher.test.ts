@@ -12,6 +12,9 @@ vi.mock("@linkedctl/core", () => ({
   getUserInfo: vi.fn(),
   createPost: vi.fn(),
   uploadImage: vi.fn(),
+  getTokenExpiry: vi.fn().mockReturnValue(undefined),
+  refreshAccessToken: vi.fn(),
+  saveOAuthTokens: vi.fn(),
   LinkedInApiError: class LinkedInApiError extends Error {
     constructor(message: string) {
       super(message);
@@ -32,26 +35,42 @@ vi.mock("@linkedctl/core", () => ({
   ]),
 }));
 
-// Mock fs/promises for file reads
+// Mock fs and fs/promises for file reads and stats
+vi.mock("node:fs", () => ({
+  existsSync: vi.fn().mockReturnValue(true),
+}));
+
 vi.mock("node:fs/promises", () => ({
-  readFile: vi.fn(),
+  readFile: vi.fn().mockResolvedValue(Buffer.from("fake-image-bytes")),
+  stat: vi.fn().mockResolvedValue({
+    isFile: () => true,
+    size: 2048,
+  }),
 }));
 
 import { LinkedCtlPublisher, LinkedInAdapterError } from "./linkedctl-publisher.js";
 import * as core from "@linkedctl/core";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
 
 const mockResolveConfig = core.resolveConfig as Mock;
 const mockGetCurrentPersonUrn = core.getCurrentPersonUrn as Mock;
 const mockGetUserInfo = core.getUserInfo as Mock;
 const mockCreatePost = core.createPost as Mock;
 const mockUploadImage = core.uploadImage as Mock;
+const mockGetTokenExpiry = core.getTokenExpiry as Mock;
 const mockReadFile = readFile as Mock;
+const mockStat = stat as Mock;
+const mockExistsSync = existsSync as Mock;
 
 function setupAuthenticatedMock(): void {
   mockResolveConfig.mockResolvedValue({
     config: {
-      oauth: { accessToken: "test-token-123" },
+      oauth: {
+        accessToken: "test-token-123",
+        scope: "openid profile email w_member_social",
+        tokenExpiresAt: "2099-01-01T00:00:00.000Z",
+      },
       apiVersion: "202601",
     },
     warnings: [],
@@ -65,11 +84,79 @@ function setupAuthenticatedMock(): void {
     picture: "https://example.com/pic.jpg",
     email: "test@example.com",
   });
+  mockGetTokenExpiry.mockReturnValue(undefined);
+  mockExistsSync.mockReturnValue(true);
+  mockStat.mockResolvedValue({ isFile: () => true, size: 2048 });
+  mockReadFile.mockResolvedValue(Buffer.from("fake-image-data"));
 }
 
 describe("LinkedCtlPublisher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("preflightCheck", () => {
+    it("returns preflight report on valid credentials", async () => {
+      setupAuthenticatedMock();
+      const publisher = new LinkedCtlPublisher();
+
+      const report = await publisher.preflightCheck();
+
+      expect(report.authenticated).toBe(true);
+      expect(report.isExpired).toBe(false);
+      expect(report.scopes.canPost).toBe(true);
+      expect(report.identity?.name).toBe("Test User");
+      expect(report.identity?.personUrn).toBe("urn:li:person:abc123");
+    });
+
+    it("detects missing w_member_social scope", async () => {
+      mockResolveConfig.mockResolvedValue({
+        config: {
+          oauth: {
+            accessToken: "test-token-123",
+            scope: "openid profile email", // missing w_member_social
+            tokenExpiresAt: "2099-01-01T00:00:00.000Z",
+          },
+          apiVersion: "202601",
+        },
+        warnings: [],
+      });
+      mockGetCurrentPersonUrn.mockResolvedValue("urn:li:person:abc123");
+      mockGetUserInfo.mockResolvedValue({
+        sub: "abc123",
+        name: "Test User",
+        email: "test@example.com",
+      });
+
+      const publisher = new LinkedCtlPublisher();
+      const report = await publisher.preflightCheck();
+
+      expect(report.authenticated).toBe(true);
+      expect(report.scopes.canPost).toBe(false);
+      expect(report.scopes.missing).toContain("w_member_social");
+      expect(report.warning).toContain("w_member_social");
+    });
+
+    it("detects expired token without refresh capability", async () => {
+      mockResolveConfig.mockResolvedValue({
+        config: {
+          oauth: {
+            accessToken: "expired-token",
+            scope: "openid profile email w_member_social",
+            tokenExpiresAt: "2020-01-01T00:00:00.000Z", // in past
+          },
+          apiVersion: "202601",
+        },
+        warnings: [],
+      });
+
+      const publisher = new LinkedCtlPublisher();
+      const report = await publisher.preflightCheck();
+
+      expect(report.authenticated).toBe(false);
+      expect(report.isExpired).toBe(true);
+      expect(report.error).toContain("expired");
+    });
   });
 
   describe("getAccount", () => {
@@ -198,12 +285,12 @@ describe("LinkedCtlPublisher", () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Unsupported image format");
+      expect(result.error).toContain("Unsupported image");
     });
 
-    it("returns error when image file cannot be read", async () => {
+    it("returns error when image file is missing", async () => {
       setupAuthenticatedMock();
-      mockReadFile.mockRejectedValue(new Error("ENOENT: no such file"));
+      mockExistsSync.mockReturnValue(false);
 
       const publisher = new LinkedCtlPublisher();
       const result = await publisher.publishImage({
@@ -212,7 +299,7 @@ describe("LinkedCtlPublisher", () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toContain("Failed to read image file");
+      expect(result.error).toContain("does not exist");
     });
   });
 

@@ -18,6 +18,26 @@ export type { AutomationConfig } from "./config/config.js";
 
 // LinkedIn adapter
 export { LinkedCtlPublisher, LinkedInAdapterError } from "./linkedin/linkedctl-publisher.js";
+export type { AuthPreflightReport } from "./linkedin/linkedctl-publisher.js";
+
+// Errors
+export {
+  AutomationError,
+  AuthError,
+  PermissionError,
+  ValidationError,
+  RateLimitError,
+  MediaError,
+  LinkedInApiError,
+  QueueError,
+  DatabaseError,
+  redactSecrets,
+} from "./errors/index.js";
+export type { ErrorCategory } from "./errors/index.js";
+
+// Validation & Quality Guard
+export { ContentValidator } from "./agents/content-validator.js";
+export type { ValidationMetrics, ContentValidationReport } from "./agents/content-validator.js";
 
 // Manual post workflow
 export {

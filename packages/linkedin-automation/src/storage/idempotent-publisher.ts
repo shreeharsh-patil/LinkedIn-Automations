@@ -6,19 +6,20 @@
  *
  * Before publishing:
  * 1. Normalize content
- * 2. Generate contentHash
- * 3. Verify source IDs haven't been published before
+ * 2. Generate contentHash and deterministic idempotencyKey
+ * 3. Verify source IDs and idempotency key haven't been published before
  * 4. Check previous published posts for duplicates
  * 5. Acquire publishing lock
- * 6. Publish
- * 7. Store LinkedIn post ID/URN
+ * 6. Publish (text or image based on draft.imagePath)
+ * 7. Store LinkedIn post ID/URN and idempotencyKey
  * 8. Mark PUBLISHED
  *
  * Does NOT blindly retry if LinkedIn returned an unknown network state.
  * Prevents duplicates via content hash and source ID tracking.
  */
 
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 
 import type { LinkedCtlPublisher } from "../linkedin/linkedctl-publisher.js";
 import type { PublishResult } from "../types/index.js";
@@ -43,15 +44,23 @@ export interface IdempotentPublishResult {
   error: string | undefined;
   /** Content hash that was used for deduplication. */
   contentHash: string;
+  /** Deterministic idempotency key. */
+  idempotencyKey?: string;
+}
+
+/**
+ * Generate a deterministic idempotency key for a draft.
+ */
+export function generateIdempotencyKey(candidateId: string, contentHash: string, mediaPath?: string): string {
+  const normMedia = mediaPath ? mediaPath.trim().toLowerCase() : "";
+  return createHash("sha256")
+    .update(`${candidateId}:${contentHash}:${normMedia}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 /**
  * IdempotentPublisher wraps LinkedIn publishing with deduplication and locking.
- *
- * It ensures that:
- * - The same content is never published twice
- * - Publishing is atomic (lock → publish → store → unlock)
- * - Unknown LinkedIn errors are not blindly retried
  */
 export class IdempotentPublisher {
   private readonly storage: StoragePort;
@@ -66,29 +75,27 @@ export class IdempotentPublisher {
 
   /**
    * Publish a draft idempotently.
-   *
-   * Checks all deduplication conditions before publishing.
-   * Returns a structured result indicating whether the publish was
-   * new, a duplicate, or failed.
+   * Supports both text-only posts and posts with attached visuals.
    */
   async publishDraft(draft: PostDraftRecord): Promise<IdempotentPublishResult> {
-    // 1. Normalize content and generate hash
+    // 1. Normalize content and generate hash & idempotency key
     const contentHash = generateContentHash(draft.text);
+    const idempotencyKey = generateIdempotencyKey(draft.candidateId, contentHash, draft.imagePath);
 
-    // 2. Check if this content hash was already published
-    if (this.storage.publishedPostExistsByHash(contentHash)) {
+    // 2. Check if this content hash or idempotency key was already published
+    if (this.storage.publishedPostExistsByHash(contentHash) || this.storage.publishedPostExistsByIdempotencyKey(idempotencyKey)) {
       return {
         success: true,
         alreadyPublished: true,
         publishResult: undefined,
         error: undefined,
         contentHash,
+        idempotencyKey,
       };
     }
 
     // 3. Check if a draft with this hash already exists (prevent duplicate drafts)
     if (draft.id !== 0 && this.storage.draftExistsByHash(contentHash)) {
-      // Only flag as duplicate if it's a different draft record
       const existing = this.storage.getAllDrafts().find((d) => d.contentHash === contentHash);
       if (existing !== undefined && existing.id !== draft.id) {
         return {
@@ -97,12 +104,23 @@ export class IdempotentPublisher {
           publishResult: undefined,
           error: `Draft with identical content already exists (draft #${existing.id})`,
           contentHash,
+          idempotencyKey,
         };
       }
     }
 
-    // 4. Try to publish via LinkedIn
-    const publishResult = await this.publisher.publishText({ text: draft.text });
+    // 4. Try to publish via LinkedIn (using image if attached and present)
+    let publishResult: PublishResult;
+    const hasValidImage = draft.imagePath && typeof draft.imagePath === "string" && existsSync(draft.imagePath);
+
+    if (hasValidImage) {
+      publishResult = await this.publisher.publishImage({
+        text: draft.text,
+        imagePath: draft.imagePath!,
+      });
+    } else {
+      publishResult = await this.publisher.publishText({ text: draft.text });
+    }
 
     if (!publishResult.success) {
       return {
@@ -111,6 +129,7 @@ export class IdempotentPublisher {
         publishResult,
         error: publishResult.error ?? "Unknown publish error",
         contentHash,
+        idempotencyKey,
       };
     }
 
@@ -122,6 +141,7 @@ export class IdempotentPublisher {
       linkedinPostUrn: publishResult.postUrn ?? "",
       linkedinPostUrl: publishResult.postUrl ?? "",
       contentHash,
+      idempotencyKey,
       publishedAt: now,
       createdAt: now,
     });
@@ -135,12 +155,12 @@ export class IdempotentPublisher {
       publishResult,
       error: undefined,
       contentHash,
+      idempotencyKey,
     };
   }
 
   /**
    * Publish a scheduled post idempotently.
-   *
    * Acquires a lock, publishes the linked draft, and releases the lock.
    */
   async publishScheduledPost(scheduled: ScheduledPostRecord): Promise<IdempotentPublishResult> {
@@ -163,6 +183,7 @@ export class IdempotentPublisher {
       const draft = this.storage.getDraft(scheduled.draftId);
       if (draft === undefined) {
         this.storage.updateScheduledPostState(scheduled.id, "FAILED");
+        this.storage.updateScheduledPostAttempt(scheduled.id, (scheduled.attempts ?? 0) + 1, `Draft #${scheduled.draftId} not found`);
         return {
           success: false,
           alreadyPublished: false,
@@ -182,6 +203,7 @@ export class IdempotentPublisher {
         this.storage.updateScheduledPostState(scheduled.id, "PUBLISHED");
       } else {
         this.storage.updateScheduledPostState(scheduled.id, "FAILED");
+        this.storage.updateScheduledPostAttempt(scheduled.id, (scheduled.attempts ?? 0) + 1, result.error);
       }
 
       return result;
@@ -192,22 +214,15 @@ export class IdempotentPublisher {
   }
 
   /**
-   * Prepare a candidate for publishing by normalizing content and checking
-   * source IDs.
-   *
-   * Returns the candidate with contentHash populated, or undefined if
-   * the candidate should be skipped (duplicate).
+   * Prepare a candidate for publishing by normalizing content and checking source IDs.
    */
   prepareCandidate(candidate: ContentCandidateRecord): ContentCandidateRecord | undefined {
-    // Generate content hash from candidate fields
     const contentHash = generateCandidateHash(candidate.repo, candidate.source, candidate.title, candidate.facts);
 
-    // Check if this candidate's content hash already exists
     if (this.storage.candidateExistsByHash(contentHash)) {
       return undefined;
     }
 
-    // Check if any source IDs have been seen
     for (const commitSha of candidate.supportingCommits) {
       if (this.storage.sourceIdExists(commitSha)) {
         return undefined;
@@ -226,7 +241,6 @@ export class IdempotentPublisher {
       }
     }
 
-    // Record all source IDs
     for (const commitSha of candidate.supportingCommits) {
       this.storage.recordSourceId(commitSha);
     }
@@ -241,22 +255,16 @@ export class IdempotentPublisher {
   }
 
   /**
-   * Check if LinkedIn returned a state that indicates the request
-   * may have succeeded (unknown network state).
-   *
-   * In this case, we should NOT blindly retry — the post might
-   * have been published.
+   * Check if LinkedIn returned a state that indicates the request may have succeeded.
    */
   isAmbiguousResult(result: PublishResult): boolean {
     if (result.success) return false;
 
     const error = result.error ?? "";
-    // LinkedIn sometimes returns 409 Conflict when a duplicate post is attempted
     if (error.includes("409") || error.includes("Conflict")) {
       return true;
     }
-    // Network timeout might have succeeded server-side
-    if (error.includes("timeout") || error.includes("ETIMEDOUT")) {
+    if (error.includes("timeout") || error.includes("ETIMEDOUT") || error.includes("ECONNRESET")) {
       return true;
     }
     return false;

@@ -180,5 +180,33 @@ describe("markDraftAsSeen", () => {
     markDraftAsSeen("Hello world", store);
 
     expect(store.seenContentHashes.size).toBe(1);
+    expect(store.seenTexts).toHaveLength(1);
+  });
+
+  it("detects highly similar drafts using n-gram similarity", () => {
+    const store = createDeduplicationStore();
+    markDraftAsSeen(
+      "Understanding React re-rendering mechanics with referential equality and useMemo hooks in high performance components",
+      store
+    );
+
+    // Draft with 85% word overlap
+    const similarDraft =
+      "Understanding React re-rendering mechanics using referential equality and useMemo hooks in high performance components today";
+    const result = isDuplicateDraft(similarDraft, store);
+
+    expect(result.isDuplicate).toBe(true);
+    expect(result.reason).toContain("similar");
+  });
+
+  it("detects duplicate opening sentences", () => {
+    const store = createDeduplicationStore();
+    markDraftAsSeen("I spent three days profiling Node.js event loop lag under heavy network traffic. Here is what we found.", store);
+
+    const duplicateHook = "I spent three days profiling Node.js event loop lag under heavy network traffic. Here are different takeaways.";
+    const result = isDuplicateDraft(duplicateHook, store);
+
+    expect(result.isDuplicate).toBe(true);
+    expect(result.reason).toContain("opening hook");
   });
 });

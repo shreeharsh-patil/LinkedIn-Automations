@@ -17,7 +17,8 @@ describe("POST_STATES", () => {
     expect(POST_STATES).toContain("PUBLISHED");
     expect(POST_STATES).toContain("FAILED");
     expect(POST_STATES).toContain("SKIPPED");
-    expect(POST_STATES).toHaveLength(10);
+    expect(POST_STATES).toContain("CANCELLED");
+    expect(POST_STATES).toHaveLength(15);
   });
 
   it("has all states as valid PostState values", () => {

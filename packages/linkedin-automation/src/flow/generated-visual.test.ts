@@ -153,4 +153,33 @@ describe("generateVisual", () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain("download");
   });
+
+  it("automatically recovers from PUBLIC_ERROR_UNSAFE_GENERATION by sanitizing prompt and retrying", async () => {
+    healthMock.mockResolvedValue({
+      status: "healthy",
+      extensionConnected: true,
+      hasFlowKey: true,
+    });
+
+    // First call rejects with Google Flow safety filter error
+    generateImageMock
+      .mockRejectedValueOnce(new Error("Flow Agent HTTP 400: Request contains an invalid argument. (PUBLIC_ERROR_UNSAFE_GENERATION)"))
+      .mockResolvedValueOnce([{ url: "http://example.com/safe-recovered.png", mediaId: "mid_safe_456" }]);
+
+    mockFetch.mockResolvedValue({
+      ok: true,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(100)),
+    });
+
+    const result = await generateVisual(
+      "Fixing deadlock crash and killing zombie processes during DDoS attack",
+      makeConfig(),
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.sanitized).toBe(true);
+    expect(result.prompt).not.toContain("killing");
+    expect(result.prompt).not.toContain("DDoS attack");
+    expect(generateImageMock).toHaveBeenCalledTimes(2);
+  });
 });

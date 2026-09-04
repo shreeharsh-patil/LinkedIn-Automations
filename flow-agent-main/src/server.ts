@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { pathToFileURL } from 'url';
 import multer from 'multer';
 import { ConfigService } from './config/config';
@@ -112,21 +113,70 @@ export function createServer(configService: ConfigService): express.Express {
 
   // REST API Routes
 
-  // Health check
-  app.get('/api/health', async (req: Request, res: Response) => {
-    await flowClient.ensureBackendRunning();
-    const flowHealth = await flowClient.checkHealth();
+  // Health & System Preflight Check
+  app.get('/api/health', async (_req: Request, res: Response) => {
+    let flowHealth: any = { status: 'offline' };
+    try {
+      await flowClient.ensureBackendRunning();
+      flowHealth = await flowClient.checkHealth();
+    } catch {
+      // Backend may be starting or offline
+    }
+
+    let linkedinStatus: any = { authenticated: false, error: 'Module not loaded' };
+    try {
+      const auto = await getAutomationModule();
+      const publisher = new auto.LinkedCtlPublisher();
+      linkedinStatus = await publisher.preflightCheck();
+    } catch (e: any) {
+      linkedinStatus = { authenticated: false, error: e.message };
+    }
+
+    let dbStatus = { ok: false, error: '' };
+    try {
+      const auto = await getAutomationModule();
+      const storage = new auto.SqliteStorage(getDbPath());
+      storage.initialize();
+      storage.close();
+      dbStatus = { ok: true, error: '' };
+    } catch (e: any) {
+      dbStatus = { ok: false, error: e.message };
+    }
+
+    const isMediaWritable = (() => {
+      try {
+        fs.accessSync(uploadDir, fs.constants.W_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    })();
+
+    const isDryRun = config.dryRun || process.env.DRY_RUN === 'true';
+
     res.json({
       status: 'online',
-      platform: 'flow-movie-agent',
+      platform: 'LinkedCtl Automation Studio',
       version: '1.0.0',
-      flowAgent: flowHealth,
-      config: {
-        llmProvider: config.llmProvider,
-        llmModel: config.llmModel,
-        aspectRatio: config.aspectRatio,
-        encoder: config.ffmpegEncoder,
+      nodeVersion: process.version,
+      dryRun: isDryRun,
+      database: {
+        healthy: dbStatus.ok,
+        path: getDbPath(),
+        error: dbStatus.error || undefined,
       },
+      linkedin: linkedinStatus,
+      flowAgent: flowHealth,
+      media: {
+        uploadDirectory: uploadDir,
+        writable: isMediaWritable,
+      },
+      llm: {
+        provider: config.llmProvider,
+        model: config.llmModel,
+        hasApiKey: llmAgent.hasValidApiKey(),
+      },
+      readyToPublish: linkedinStatus.authenticated && linkedinStatus.scopes?.canPost && dbStatus.ok,
     });
   });
 
@@ -310,7 +360,12 @@ export function createServer(configService: ConfigService): express.Express {
         }
       }
       const fileUrl = pathToFileURL(resolvedPath).href;
-      automationModulePromise = import(fileUrl);
+      try {
+        const dynamicImport = new Function('url', 'return import(url)');
+        automationModulePromise = dynamicImport(fileUrl);
+      } catch {
+        automationModulePromise = Promise.resolve(require(resolvedPath));
+      }
     }
     return automationModulePromise;
   };
@@ -335,15 +390,26 @@ export function createServer(configService: ConfigService): express.Express {
     }
   });
 
-  // LinkedIn Auth & Account Status
+  // LinkedIn Auth & Account Status Preflight
   app.get('/api/linkedin/status', async (_req: Request, res: Response) => {
     try {
       const { LinkedCtlPublisher } = await getAutomationModule();
       const publisher = new LinkedCtlPublisher();
-      const account = await publisher.getAccount();
-      res.json({ authenticated: true, account });
+      const report = await publisher.preflightCheck();
+      res.json(report);
     } catch (err: any) {
-      res.json({ authenticated: false, error: err.message });
+      res.json({ authenticated: false, isExpired: false, scopes: { canPost: false }, error: err.message });
+    }
+  });
+
+  app.get('/api/linkedin/auth-status', async (_req: Request, res: Response) => {
+    try {
+      const { LinkedCtlPublisher } = await getAutomationModule();
+      const publisher = new LinkedCtlPublisher();
+      const report = await publisher.preflightCheck();
+      res.json(report);
+    } catch (err: any) {
+      res.json({ authenticated: false, isExpired: false, scopes: { canPost: false }, error: err.message });
     }
   });
 
@@ -357,8 +423,8 @@ export function createServer(configService: ConfigService): express.Express {
         const stateQuery = req.query.state ? (String(req.query.state) as any) : undefined;
         const rawDrafts = stateQuery ? storage.getDraftsByState(stateQuery) : storage.getAllDrafts();
         const drafts = rawDrafts.map((d: any) => {
-          let attachedImage = undefined;
-          if (Array.isArray(d.suggestions)) {
+          let attachedImage = d.imagePath || undefined;
+          if (!attachedImage && Array.isArray(d.suggestions)) {
             const imgMeta = d.suggestions.find((s: string) => typeof s === 'string' && s.startsWith('IMAGE:'));
             if (imgMeta) attachedImage = imgMeta.replace('IMAGE:', '');
           }
@@ -388,8 +454,8 @@ export function createServer(configService: ConfigService): express.Express {
         const draftId = parseInt(idStr, 10);
         const draft = storage.getDraft(draftId);
         if (!draft) return res.status(404).json({ error: `Draft #${draftId} not found.` });
-        let attachedImage = undefined;
-        if (Array.isArray(draft.suggestions)) {
+        let attachedImage = draft.imagePath || undefined;
+        if (!attachedImage && Array.isArray(draft.suggestions)) {
           const imgMeta = draft.suggestions.find((s: string) => typeof s === 'string' && s.startsWith('IMAGE:'));
           if (imgMeta) attachedImage = imgMeta.replace('IMAGE:', '');
         }
@@ -574,44 +640,52 @@ export function createServer(configService: ConfigService): express.Express {
         const draft = storage.getDraft(draftId);
         if (!draft) return res.status(404).json({ success: false, error: `Draft #${draftId} not found.` });
 
-        // Check if draft has an attached image
-        let imagePath = req.body?.imagePath;
+        let imagePath = req.body?.imagePath || draft.imagePath;
         if (!imagePath && Array.isArray(draft.suggestions)) {
           const imgMeta = draft.suggestions.find((s: string) => typeof s === 'string' && s.startsWith('IMAGE:'));
           if (imgMeta) imagePath = imgMeta.replace('IMAGE:', '');
         }
+        if (imagePath && imagePath !== draft.imagePath) {
+          storage.updateDraftMedia(draft.id, imagePath);
+          draft.imagePath = imagePath;
+        }
 
         const publisher = new auto.LinkedCtlPublisher();
-        let publishResult;
-        if (imagePath && fs.existsSync(imagePath)) {
-          publishResult = await publisher.publishImage({ text: draft.text, imagePath });
-        } else {
-          publishResult = await publisher.publishText({ text: draft.text });
+        const preflight = await publisher.preflightCheck();
+        if (!preflight.authenticated || !preflight.scopes.canPost) {
+          return res.status(401).json({
+            success: false,
+            error: preflight.error || preflight.warning || 'LinkedIn authorization check failed.',
+            preflight,
+          });
         }
 
-        if (!publishResult.success) {
-          return res.status(500).json({ success: false, error: publishResult.error || 'Publishing failed on LinkedIn.' });
+        const isDryRun = config.dryRun || process.env.DRY_RUN === 'true' || req.query.dryRun === 'true' || req.body?.dryRun === true;
+        if (isDryRun) {
+          return res.json({
+            success: true,
+            dryRun: true,
+            message: 'DRY_RUN: Preflight verified, validation passed. Post ready for publish.',
+            draftId: draft.id,
+            textPreview: draft.text.slice(0, 100),
+            hasImage: !!(imagePath && fs.existsSync(imagePath)),
+          });
         }
 
-        const now = new Date().toISOString();
-        const finalUrl = publishResult.postUrl || (publishResult.postUrn ? `https://www.linkedin.com/feed/update/${publishResult.postUrn}/` : '');
-        const pubId = storage.insertPublishedPost({
-          draftId: draft.id,
-          linkedinPostId: publishResult.postId || '',
-          linkedinPostUrn: publishResult.postUrn || '',
-          linkedinPostUrl: finalUrl,
-          contentHash: draft.contentHash || auto.generateContentHash(draft.text),
-          publishedAt: now,
-          createdAt: now,
-        });
-        storage.updateDraftState(draft.id, 'PUBLISHED');
+        const idempotent = new auto.IdempotentPublisher(storage, publisher);
+        const result = await idempotent.publishDraft(draft);
+
+        if (!result.success) {
+          return res.status(500).json({ success: false, error: result.error || 'Publishing failed.' });
+        }
 
         res.json({
           success: true,
-          publishedId: pubId,
-          postId: publishResult.postId,
-          postUrn: publishResult.postUrn,
-          postUrl: finalUrl,
+          alreadyPublished: result.alreadyPublished,
+          postId: result.publishResult?.postId,
+          postUrn: result.publishResult?.postUrn,
+          postUrl: result.publishResult?.postUrl,
+          idempotencyKey: result.idempotencyKey,
         });
       } finally {
         storage.close();
@@ -621,26 +695,60 @@ export function createServer(configService: ConfigService): express.Express {
     }
   });
 
-  // Serve local image file securely for preview
+  // Serve local image file securely for preview with path confinement
   app.get('/api/media/image', (req: Request, res: Response) => {
     try {
-      const filePath = req.query.path ? String(req.query.path) : '';
-      if (!filePath || !fs.existsSync(filePath)) {
-        return res.status(404).send('Image file not found.');
+      const rawPath = req.query.path ? String(req.query.path) : '';
+      if (!rawPath) {
+        return res.status(400).json({ error: 'Image path query parameter is required.' });
       }
-      const ext = path.extname(filePath).toLowerCase();
+
+      const resolved = path.resolve(rawPath);
+      const allowedRoots = [
+        path.resolve(config.outputFolder),
+        path.resolve(uploadDir),
+        path.resolve(process.cwd()),
+        path.resolve(__dirname, '..'),
+        path.resolve(__dirname, '../..'),
+        path.resolve(os.tmpdir(), 'linkedauto-visuals'),
+        path.resolve(os.tmpdir()),
+      ];
+
+      const normResolved = path.normalize(resolved).toLowerCase();
+      const isAllowed = allowedRoots.some((root) => {
+        const normRoot = path.normalize(root).toLowerCase();
+        return (
+          normResolved === normRoot ||
+          normResolved.startsWith(normRoot.endsWith(path.sep) ? normRoot : normRoot + path.sep)
+        );
+      });
+      if (!isAllowed) {
+        return res.status(403).json({ error: 'Access denied: Path is outside allowed media directories.' });
+      }
+
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+        return res.status(404).json({ error: 'Image file not found.' });
+      }
+
+      const ext = path.extname(resolved).toLowerCase();
       const mimeTypes: Record<string, string> = {
         '.png': 'image/png',
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg',
         '.webp': 'image/webp',
         '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
       };
-      res.setHeader('Content-Type', mimeTypes[ext] || 'image/png');
+
+      if (!mimeTypes[ext]) {
+        return res.status(400).json({ error: 'Requested file is not an allowed image format.' });
+      }
+
+      res.setHeader('Content-Type', mimeTypes[ext]);
       res.setHeader('Cache-Control', 'public, max-age=3600');
-      fs.createReadStream(filePath).pipe(res);
+      fs.createReadStream(resolved).pipe(res);
     } catch (err: any) {
-      res.status(500).send(err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -648,7 +756,7 @@ export function createServer(configService: ConfigService): express.Express {
   app.post('/api/linkedin/generate-visual', async (req: Request, res: Response) => {
     try {
       const { generateVisual, createVisualDirector, loadConfig } = await getAutomationModule();
-      const { prompt, text, technicalContext } = req.body;
+      const { prompt, text, technicalContext, aspect = 'landscape' } = req.body;
       const automationConfig = loadConfig();
 
       let targetPrompt = prompt;
@@ -662,14 +770,32 @@ export function createServer(configService: ConfigService): express.Express {
         return res.status(400).json({ error: 'Prompt or post text is required to generate visual.' });
       }
 
-      const result = await generateVisual(targetPrompt.trim(), automationConfig);
+      const validAspects = ['landscape', 'portrait', 'square', '4x3', '3x4'] as const;
+      const chosenAspect = validAspects.includes(aspect) ? aspect : 'landscape';
+
+      const result = await generateVisual(targetPrompt.trim(), automationConfig, {
+        aspect: chosenAspect,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          error: result.error || 'Failed to generate visual via Flow Agent.',
+          prompt: result.prompt,
+        });
+      }
+
       const previewUrl = result.imagePath
         ? `/api/media/image?path=${encodeURIComponent(result.imagePath)}`
         : undefined;
 
-      res.json({ ...result, previewUrl });
+      res.json({
+        ...result,
+        previewUrl,
+        aspect: chosenAspect,
+      });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -762,13 +888,25 @@ Structure Archetype: ${archetype}`;
     }
   });
 
-  // Instant Manual Post to LinkedIn
+  // Instant Manual Post to LinkedIn with Preflight, Validation, and Idempotency
   app.post('/api/linkedin/publish', async (req: Request, res: Response) => {
     try {
       const auto = await getAutomationModule();
       let { text, imagePath, imageBase64, mimeType = 'image/png' } = req.body;
       if (!text || !text.trim()) {
         return res.status(400).json({ error: 'Post text cannot be empty.' });
+      }
+
+      // 1. Content Validation & Quality Scorer
+      if (auto.ContentValidator) {
+        const validation = auto.ContentValidator.validate(text.trim());
+        if (!validation.valid) {
+          return res.status(400).json({
+            error: 'Content validation failed',
+            details: validation.errors,
+            report: validation,
+          });
+        }
       }
 
       if (!imagePath && imageBase64) {
@@ -779,38 +917,67 @@ Structure Archetype: ${archetype}`;
         imagePath = tempPath;
       }
 
+      // 2. Preflight Authentication & Scope Verification
       const publisher = new auto.LinkedCtlPublisher();
-      let result;
-      if (imagePath && typeof imagePath === 'string' && imagePath.trim() && fs.existsSync(imagePath.trim())) {
-        result = await publisher.publishImage({ text: text.trim(), imagePath: imagePath.trim() });
-      } else {
-        result = await publisher.publishText({ text: text.trim() });
+      const preflight = await publisher.preflightCheck();
+      if (!preflight.authenticated || !preflight.scopes.canPost) {
+        return res.status(401).json({
+          success: false,
+          error: preflight.error || preflight.warning || 'LinkedIn authorization check failed.',
+          preflight,
+        });
       }
 
-      if (result.success) {
-        try {
-          const storage = new auto.SqliteStorage(getDbPath());
-          storage.initialize();
-          try {
-            const now = new Date().toISOString();
-            storage.insertPublishedPost({
-              draftId: 0,
-              linkedinPostId: result.postId || '',
-              linkedinPostUrn: result.postUrn || '',
-              linkedinPostUrl: result.postUrl || (result.postUrn ? `https://www.linkedin.com/feed/update/${result.postUrn}/` : ''),
-              contentHash: auto.generateContentHash(text.trim()),
-              publishedAt: now,
-              createdAt: now,
-            });
-          } finally {
-            storage.close();
-          }
-        } catch (dbErr) {
-          logger.warn(`Could not save published post to DB: ${(dbErr as Error).message}`);
+      // 3. Deduplication Check against SQLite database
+      const storage = new auto.SqliteStorage(getDbPath());
+      storage.initialize();
+      const contentHash = auto.generateContentHash(text.trim());
+
+      try {
+        if (storage.publishedPostExistsByHash(contentHash)) {
+          return res.status(409).json({
+            success: false,
+            alreadyPublished: true,
+            error: 'Identical content has already been published to LinkedIn.',
+          });
         }
-      }
 
-      res.json(result);
+        // 4. Safe Review / Dry Run Check
+        const isDryRun = config.dryRun || process.env.DRY_RUN === 'true' || req.query.dryRun === 'true' || req.body?.dryRun === true;
+        if (isDryRun) {
+          return res.json({
+            success: true,
+            dryRun: true,
+            message: 'DRY_RUN: Preflight, content validation, and duplicate checks passed without publishing.',
+            hasImage: !!(imagePath && fs.existsSync(imagePath)),
+          });
+        }
+
+        // 5. Execute publish via LinkedCtl
+        let result;
+        if (imagePath && typeof imagePath === 'string' && imagePath.trim() && fs.existsSync(imagePath.trim())) {
+          result = await publisher.publishImage({ text: text.trim(), imagePath: imagePath.trim() });
+        } else {
+          result = await publisher.publishText({ text: text.trim() });
+        }
+
+        if (result.success) {
+          const now = new Date().toISOString();
+          storage.insertPublishedPost({
+            draftId: 0,
+            linkedinPostId: result.postId || '',
+            linkedinPostUrn: result.postUrn || '',
+            linkedinPostUrl: result.postUrl || (result.postUrn ? `https://www.linkedin.com/feed/update/${result.postUrn}/` : ''),
+            contentHash,
+            publishedAt: now,
+            createdAt: now,
+          });
+        }
+
+        res.json(result);
+      } finally {
+        storage.close();
+      }
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

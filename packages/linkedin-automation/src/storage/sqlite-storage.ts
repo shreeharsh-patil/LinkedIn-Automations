@@ -7,8 +7,8 @@
  * Uses the built-in `node:sqlite` module (available since Node.js 22.5).
  * The database file is created automatically on first use.
  *
- * This is the local-development storage backend. A PostgreSQL implementation
- * can be added later by implementing the same StoragePort interface.
+ * Provides transactional schema migrations, atomic job claiming,
+ * retry state tracking, and media attachment persistence.
  */
 
 import { DatabaseSync } from "node:sqlite";
@@ -36,7 +36,7 @@ export class SqliteStorage implements StoragePort {
     this.db.exec("PRAGMA foreign_keys=ON");
   }
 
-  /** Initialize the database schema. Safe to call multiple times. */
+  /** Initialize the database schema and apply incremental migrations. Safe to call multiple times. */
   initialize(): void {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS content_candidates (
@@ -70,6 +70,8 @@ export class SqliteStorage implements StoragePort {
         review_decision TEXT NOT NULL DEFAULT '',
         review_score INTEGER NOT NULL DEFAULT 0,
         suggestions TEXT NOT NULL DEFAULT '[]',
+        image_path TEXT DEFAULT '',
+        media_urn TEXT DEFAULT '',
         state TEXT NOT NULL DEFAULT 'DRAFT',
         content_hash TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
@@ -83,6 +85,9 @@ export class SqliteStorage implements StoragePort {
         lock_id TEXT,
         lock_expires_at TEXT,
         state TEXT NOT NULL DEFAULT 'SCHEDULED',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT DEFAULT '',
+        idempotency_key TEXT DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -94,6 +99,7 @@ export class SqliteStorage implements StoragePort {
         linkedin_post_urn TEXT NOT NULL,
         linkedin_post_url TEXT NOT NULL DEFAULT '',
         content_hash TEXT NOT NULL,
+        idempotency_key TEXT DEFAULT '',
         published_at TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
@@ -110,6 +116,45 @@ export class SqliteStorage implements StoragePort {
         updated_at TEXT NOT NULL
       );
     `);
+
+    // Run migrations for existing databases that were created before these columns were added
+    this.runMigrations();
+  }
+
+  private runMigrations(): void {
+    try {
+      const draftCols = this.getTableColumns("post_drafts");
+      if (!draftCols.has("image_path")) {
+        this.db.exec("ALTER TABLE post_drafts ADD COLUMN image_path TEXT DEFAULT ''");
+      }
+      if (!draftCols.has("media_urn")) {
+        this.db.exec("ALTER TABLE post_drafts ADD COLUMN media_urn TEXT DEFAULT ''");
+      }
+
+      const scheduledCols = this.getTableColumns("scheduled_posts");
+      if (!scheduledCols.has("attempts")) {
+        this.db.exec("ALTER TABLE scheduled_posts ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0");
+      }
+      if (!scheduledCols.has("last_error")) {
+        this.db.exec("ALTER TABLE scheduled_posts ADD COLUMN last_error TEXT DEFAULT ''");
+      }
+      if (!scheduledCols.has("idempotency_key")) {
+        this.db.exec("ALTER TABLE scheduled_posts ADD COLUMN idempotency_key TEXT DEFAULT ''");
+      }
+
+      const publishedCols = this.getTableColumns("published_posts");
+      if (!publishedCols.has("idempotency_key")) {
+        this.db.exec("ALTER TABLE published_posts ADD COLUMN idempotency_key TEXT DEFAULT ''");
+      }
+    } catch {
+      // Columns may already exist or table is fresh
+    }
+  }
+
+  private getTableColumns(tableName: string): Set<string> {
+    const stmt = this.db.prepare(`PRAGMA table_info(${tableName})`);
+    const rows = stmt.all() as Array<{ name: string }>;
+    return new Set(rows.map((r) => r.name));
   }
 
   /** Close the database connection. */
@@ -122,8 +167,9 @@ export class SqliteStorage implements StoragePort {
   insertCandidate(candidate: ContentCandidateRecord): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO content_candidates
-        (id, repo, source, score, title, facts, reason, supporting_commits,
-         supporting_files, state, content_hash, created_at, updated_at)
+        (id, repo, source, score, title, facts, reason,
+         supporting_commits, supporting_files, state, content_hash,
+         created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
@@ -187,8 +233,8 @@ export class SqliteStorage implements StoragePort {
       INSERT INTO post_drafts
         (candidate_id, text, word_count, facts_used, slop_score,
          verification_summary, review_decision, review_score, suggestions,
-         state, content_hash, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         image_path, media_urn, state, content_hash, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       draft.candidateId,
@@ -200,6 +246,8 @@ export class SqliteStorage implements StoragePort {
       draft.reviewDecision,
       draft.reviewScore,
       JSON.stringify(draft.suggestions),
+      draft.imagePath ?? "",
+      draft.mediaUrn ?? "",
       draft.state,
       draft.contentHash,
       draft.createdAt,
@@ -227,6 +275,11 @@ export class SqliteStorage implements StoragePort {
     stmt.run(text, wordCount, contentHash, new Date().toISOString(), id);
   }
 
+  updateDraftMedia(id: number, imagePath?: string, mediaUrn?: string): void {
+    const stmt = this.db.prepare("UPDATE post_drafts SET image_path = ?, media_urn = ?, updated_at = ? WHERE id = ?");
+    stmt.run(imagePath ?? "", mediaUrn ?? "", new Date().toISOString(), id);
+  }
+
   getDraftsByState(state: PostState): PostDraftRecord[] {
     const stmt = this.db.prepare("SELECT * FROM post_drafts WHERE state = ? ORDER BY created_at");
     return stmt.all(state).map((row) => this.hydrateDraft(row));
@@ -244,11 +297,11 @@ export class SqliteStorage implements StoragePort {
 
   // ─── Scheduled Posts ─────────────────────────────────────────
 
-  insertScheduledPost(post: Omit<ScheduledPostRecord, "id">): number {
+  insertScheduledPost(post: Omit<ScheduledPostRecord, "id" | "attempts"> & { attempts?: number }): number {
     const stmt = this.db.prepare(`
       INSERT INTO scheduled_posts
-        (draft_id, scheduled_at, lock_id, lock_expires_at, state, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (draft_id, scheduled_at, lock_id, lock_expires_at, state, attempts, last_error, idempotency_key, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       post.draftId,
@@ -256,6 +309,9 @@ export class SqliteStorage implements StoragePort {
       post.lockId ?? null,
       post.lockExpiresAt ?? null,
       post.state,
+      post.attempts ?? 0,
+      post.lastError ?? "",
+      post.idempotencyKey ?? "",
       post.createdAt,
       post.updatedAt,
     );
@@ -274,16 +330,24 @@ export class SqliteStorage implements StoragePort {
     stmt.run(state, new Date().toISOString(), id);
   }
 
+  updateScheduledPostAttempt(id: number, attempts: number, lastError?: string): void {
+    const stmt = this.db.prepare(`
+      UPDATE scheduled_posts
+      SET attempts = ?, last_error = ?, updated_at = ?
+      WHERE id = ?
+    `);
+    stmt.run(attempts, lastError ?? "", new Date().toISOString(), id);
+  }
+
   acquirePublishLock(id: number, lockId: string, lockDurationMs: number): string | undefined {
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + lockDurationMs).toISOString();
 
-    // Only acquire if not already locked (or lock has expired)
     const stmt = this.db.prepare(`
       UPDATE scheduled_posts
       SET lock_id = ?, lock_expires_at = ?, updated_at = ?
       WHERE id = ?
-        AND state = 'SCHEDULED'
+        AND (state = 'SCHEDULED' OR state = 'PROCESSING')
         AND (lock_id IS NULL OR lock_expires_at < ?)
     `);
     const result = stmt.run(lockId, expiresAt, now, id, now);
@@ -318,14 +382,62 @@ export class SqliteStorage implements StoragePort {
     return this.hydrateScheduledPost(row);
   }
 
+  /**
+   * Atomically claim and lock the next due scheduled post in a single transaction.
+   * Guaranteed to prevent race conditions when multiple worker processes are running.
+   */
+  claimNextScheduledPost(lockId: string, lockDurationMs: number): ScheduledPostRecord | undefined {
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const expiresIso = new Date(now.getTime() + lockDurationMs).toISOString();
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const selectStmt = this.db.prepare(`
+        SELECT id FROM scheduled_posts
+        WHERE state = 'SCHEDULED'
+          AND (lock_id IS NULL OR lock_expires_at < ?)
+          AND scheduled_at <= ?
+        ORDER BY scheduled_at
+        LIMIT 1
+      `);
+      const row = selectStmt.get(nowIso, nowIso) as { id: number } | undefined;
+      if (!row) {
+        this.db.exec("COMMIT");
+        return undefined;
+      }
+
+      const updateStmt = this.db.prepare(`
+        UPDATE scheduled_posts
+        SET lock_id = ?, lock_expires_at = ?, state = 'PROCESSING', updated_at = ?
+        WHERE id = ? AND state = 'SCHEDULED'
+      `);
+      const result = updateStmt.run(lockId, expiresIso, nowIso, row.id);
+      this.db.exec("COMMIT");
+
+      if (result.changes === 0) {
+        return undefined;
+      }
+
+      return this.getScheduledPost(row.id);
+    } catch (err) {
+      try {
+        this.db.exec("ROLLBACK");
+      } catch {
+        // ignore rollback errors if transaction was closed
+      }
+      throw err;
+    }
+  }
+
   // ─── Published Posts ─────────────────────────────────────────
 
   insertPublishedPost(post: Omit<PublishedPostRecord, "id">): number {
     const stmt = this.db.prepare(`
       INSERT INTO published_posts
         (draft_id, linkedin_post_id, linkedin_post_urn, linkedin_post_url,
-         content_hash, published_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+         content_hash, idempotency_key, published_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       post.draftId,
@@ -333,6 +445,7 @@ export class SqliteStorage implements StoragePort {
       post.linkedinPostUrn,
       post.linkedinPostUrl,
       post.contentHash,
+      post.idempotencyKey ?? "",
       post.publishedAt,
       post.createdAt,
     );
@@ -349,6 +462,12 @@ export class SqliteStorage implements StoragePort {
     return stmt.get(contentHash) !== undefined;
   }
 
+  publishedPostExistsByIdempotencyKey(key: string): boolean {
+    if (!key || key.trim() === "") return false;
+    const stmt = this.db.prepare("SELECT 1 FROM published_posts WHERE idempotency_key = ? LIMIT 1");
+    return stmt.get(key) !== undefined;
+  }
+
   getPublishedPostByUrn(urn: string): PublishedPostRecord | undefined {
     const stmt = this.db.prepare("SELECT * FROM published_posts WHERE linkedin_post_urn = ?");
     const row = stmt.get(urn);
@@ -362,7 +481,6 @@ export class SqliteStorage implements StoragePort {
     const stmt = this.db.prepare("SELECT * FROM automation_settings WHERE id = 1");
     const row = stmt.get();
     if (row === undefined) {
-      // Insert defaults
       const now = new Date().toISOString();
       const insert = this.db.prepare(`
         INSERT OR IGNORE INTO automation_settings
@@ -390,7 +508,6 @@ export class SqliteStorage implements StoragePort {
   }
 
   updateSettings(settings: Omit<AutomationSettingsRecord, "id" | "updatedAt">): void {
-    // Ensure the row exists first
     this.getSettings();
 
     const stmt = this.db.prepare(`
@@ -444,6 +561,8 @@ export class SqliteStorage implements StoragePort {
       reviewDecision: String(row["review_decision"]),
       reviewScore: Number(row["review_score"]),
       suggestions: JSON.parse(String(row["suggestions"])) as string[],
+      imagePath: typeof row["image_path"] === "string" && row["image_path"] ? row["image_path"] : undefined,
+      mediaUrn: typeof row["media_urn"] === "string" && row["media_urn"] ? row["media_urn"] : undefined,
       state: String(row["state"]) as PostState,
       contentHash: String(row["content_hash"]),
       createdAt: String(row["created_at"]),
@@ -459,6 +578,9 @@ export class SqliteStorage implements StoragePort {
       lockId: typeof row["lock_id"] === "string" ? row["lock_id"] : undefined,
       lockExpiresAt: typeof row["lock_expires_at"] === "string" ? row["lock_expires_at"] : undefined,
       state: String(row["state"]) as PostState,
+      attempts: Number(row["attempts"] ?? 0),
+      lastError: typeof row["last_error"] === "string" && row["last_error"] ? row["last_error"] : undefined,
+      idempotencyKey: typeof row["idempotency_key"] === "string" && row["idempotency_key"] ? row["idempotency_key"] : undefined,
       createdAt: String(row["created_at"]),
       updatedAt: String(row["updated_at"]),
     };
@@ -472,6 +594,7 @@ export class SqliteStorage implements StoragePort {
       linkedinPostUrn: String(row["linkedin_post_urn"]),
       linkedinPostUrl: String(row["linkedin_post_url"]),
       contentHash: String(row["content_hash"]),
+      idempotencyKey: typeof row["idempotency_key"] === "string" && row["idempotency_key"] ? row["idempotency_key"] : undefined,
       publishedAt: String(row["published_at"]),
       createdAt: String(row["created_at"]),
     };

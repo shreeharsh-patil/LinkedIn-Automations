@@ -209,6 +209,7 @@ function activateTab(tabName) {
 
 async function checkLinkedInAuth() {
   const dot = document.getElementById('linkedinStatusDot');
+  const headerDot = document.getElementById('headerAuthDot');
   const title = document.getElementById('linkedinStatusTitle');
   const sub = document.getElementById('linkedinStatusSub');
   const userBadge = document.getElementById('userBadge');
@@ -218,20 +219,24 @@ async function checkLinkedInAuth() {
     const res = await fetch('/api/linkedin/status');
     const data = await res.json();
 
-    if (data.authenticated && data.account) {
+    if (data.authenticated && (data.account || data.identity || data.activeProfile)) {
+      const name = (data.account && data.account.name) || (data.identity && data.identity.name) || data.activeProfile || 'Connected';
       if (dot) dot.className = 'status-dot connected';
-      if (title) title.textContent = data.account.name || 'LinkedIn Connected';
+      if (headerDot) headerDot.className = 'status-dot connected';
+      if (title) title.textContent = name;
       if (sub) sub.textContent = 'Authenticated';
-      if (userBadge) userBadge.textContent = data.account.name || 'Connected';
-      if (mockUserName) mockUserName.textContent = data.account.name || 'LinkedIn User';
+      if (userBadge) userBadge.textContent = name;
+      if (mockUserName) mockUserName.textContent = name;
     } else {
       if (dot) dot.className = 'status-dot';
-      if (title) title.textContent = 'Login Required';
-      if (sub) sub.textContent = 'Run linkedctl auth login';
+      if (headerDot) headerDot.className = 'status-dot';
+      if (title) title.textContent = 'Disconnected';
+      if (sub) sub.textContent = 'Login required';
       if (userBadge) userBadge.textContent = 'Not connected';
     }
   } catch {
     if (dot) dot.className = 'status-dot error';
+    if (headerDot) headerDot.className = 'status-dot error';
     if (title) title.textContent = 'Auth Check Failed';
   }
 }
@@ -306,7 +311,7 @@ function initLinkedInComposer() {
     }
 
     btnSynthesize.disabled = true;
-    btnSynthesize.textContent = 'Synthesizing...';
+    btnSynthesize.textContent = 'Generating draft...';
 
     try {
       const res = await fetch('/api/linkedin/enhance-post', {
@@ -317,7 +322,7 @@ function initLinkedInComposer() {
 
       const data = await res.json();
       if (!res.ok || !data.text) {
-        throw new Error(data.error || 'Failed to synthesize post');
+        throw new Error(data.error || 'Failed to generate draft');
       }
 
       if (textArea) {
@@ -331,38 +336,104 @@ function initLinkedInComposer() {
         visualPromptInput.value = `Technical system architecture diagram showing ${cleanTopic} components, clean vector flows, database schema nodes, dark minimalist engineering blueprint`;
       }
 
-      showToast(`Synthesized technical post for: ${topic || 'System'}`, 'success');
-      appendTerminalLog({ level: 'success', message: `Synthesized informative technical post for topic: ${topic || 'System'}` });
+      showToast(`Draft generated for: ${topic || 'System'}`, 'success');
+      appendTerminalLog({ level: 'success', message: `Generated draft for topic: ${topic || 'System'}` });
     } catch (err) {
-      showToast(`Synthesis Error: ${err.message}`, 'error');
+      showToast(`Generation Error: ${err.message}`, 'error');
     } finally {
       btnSynthesize.disabled = false;
-      btnSynthesize.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Synthesize Draft`;
+      btnSynthesize.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg> Generate draft`;
     }
   });
 
   // Real-time Live Feed Mockup sync & Character / Word Counting
+  const tagChips = document.querySelectorAll('#quickTags .tag-chip');
+
   textArea?.addEventListener('input', () => {
     const text = textArea.value;
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     if (charCount) charCount.textContent = `${text.length.toLocaleString()} / 3,000`;
     if (wordCount) wordCount.textContent = `${words} word${words === 1 ? '' : 's'}`;
     if (mockText) {
-      mockText.textContent = text.trim() ? text : 'Write your post caption on the left to see the live preview here...';
+      if (text.trim()) {
+        mockText.textContent = text;
+        mockText.classList.remove('empty');
+      } else {
+        mockText.textContent = 'Your post preview will appear here.';
+        mockText.classList.add('empty');
+      }
+    }
+
+    // Sync hashtag chips active state
+    tagChips.forEach((chip) => {
+      const tag = chip.getAttribute('data-tag');
+      if (tag && text.includes(tag)) {
+        chip.classList.add('active');
+      } else {
+        chip.classList.remove('active');
+      }
+    });
+  });
+
+  // Ctrl/Cmd + Enter to trigger publish
+  textArea?.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('btnLiPublishNow')?.click();
     }
   });
 
-  // Quick Hashtag Insertion Chips
-  const tagChips = document.querySelectorAll('#quickTags .tag-chip');
+  // Formatting Toolbar Helper
+  function formatSelection(prefix, suffix = '') {
+    if (!textArea) return;
+    const start = textArea.selectionStart;
+    const end = textArea.selectionEnd;
+    const selected = textArea.value.substring(start, end) || 'text';
+    textArea.setRangeText(`${prefix}${selected}${suffix}`, start, end, 'end');
+    textArea.dispatchEvent(new Event('input'));
+    textArea.focus();
+  }
+
+  document.getElementById('tbBtnBold')?.addEventListener('click', () => formatSelection('**', '**'));
+  document.getElementById('tbBtnCode')?.addEventListener('click', () => formatSelection('`', '`'));
+  document.getElementById('tbBtnList')?.addEventListener('click', () => formatSelection('\n- ', ''));
+  document.getElementById('tbBtnLink')?.addEventListener('click', () => formatSelection('[', '](https://)'));
+  document.getElementById('tbBtnEmoji')?.addEventListener('click', () => formatSelection('⚡ ', ''));
+
+  // Quick Hashtag Insertion / Removal Chips (Toggle behavior)
   tagChips.forEach((chip) => {
     chip.addEventListener('click', () => {
       const tag = chip.getAttribute('data-tag');
       if (!tag || !textArea) return;
-      if (!textArea.value.includes(tag)) {
+      if (textArea.value.includes(tag)) {
+        // Toggle off
+        textArea.value = textArea.value.replace(new RegExp(`\\s*${tag}`, 'g'), '').trim();
+        showToast(`Removed ${tag}`, 'info', 1200);
+      } else {
+        // Toggle on
         textArea.value = (textArea.value.trim() ? `${textArea.value.trim()}\n\n${tag}` : tag);
-        textArea.dispatchEvent(new Event('input'));
-        showToast(`Added ${tag}`, 'info', 1500);
+        showToast(`Added ${tag}`, 'info', 1200);
       }
+      textArea.dispatchEvent(new Event('input'));
+    });
+  });
+
+  // Mobile Drawer Toggle
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  const sidebar = document.getElementById('appSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  function setSidebar(open) {
+    sidebar?.classList.toggle('open', open);
+    backdrop?.classList.toggle('active', open);
+  }
+
+  mobileMenuBtn?.addEventListener('click', () => setSidebar(true));
+  backdrop?.addEventListener('click', () => setSidebar(false));
+
+  document.querySelectorAll('.nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      if (window.innerWidth <= 768) setSidebar(false);
     });
   });
 
@@ -481,7 +552,7 @@ function initLinkedInComposer() {
         if (previewBox && previewImg && previewPath) {
           previewPath.textContent = file.name;
           previewImg.src = uploadData.previewUrl;
-          previewBox.style.display = 'block';
+          previewBox.style.display = 'flex';
         }
 
         showToast(`Uploaded ${file.name}`, 'success');
@@ -511,7 +582,7 @@ function initLinkedInComposer() {
     }
 
     btnGenVisual.disabled = true;
-    btnGenVisual.textContent = 'Synthesizing Image...';
+    btnGenVisual.textContent = 'Generating image...';
 
     try {
       const res = await fetch('/api/linkedin/generate-visual', {
@@ -529,28 +600,38 @@ function initLinkedInComposer() {
       const displayUrl = data.previewUrl || (data.imagePath ? `/api/media/image?path=${encodeURIComponent(data.imagePath)}` : '');
 
       if (previewBox && previewImg && previewPath) {
-        previewPath.textContent = data.imagePath ? data.imagePath.split(/[\\/]/).pop() : 'Generated Image';
+        previewPath.textContent = data.imagePath ? data.imagePath.split(/[\\/]/).pop() : 'Attached Image';
         previewImg.src = displayUrl;
-        previewBox.style.display = 'block';
+        previewBox.style.display = 'flex';
       }
       if (mockMedia && mockImage) {
         mockImage.src = displayUrl;
         mockMedia.style.display = 'block';
       }
 
-      showToast('AI Image synthesized successfully!', 'success');
+      if (data.sanitized) {
+        showToast('Prompt adapted to comply with image safety policies. Image ready!', 'info', 4500);
+      } else {
+        showToast('AI Image generated successfully!', 'success');
+      }
       appendTerminalLog({ level: 'success', message: `AI Image generated: ${data.imagePath}` });
     } catch (err) {
-      showToast(`Image Generation Error: ${err.message}`, 'error', 4500);
+      const errMsg = (err && err.message) || String(err);
+      if (errMsg.includes('UNSAFE_GENERATION') || errMsg.includes('safety filter')) {
+        showToast('Image Safety Filter: Prompt triggered content safety rules. Try an abstract architecture diagram prompt.', 'warning', 6000);
+      } else {
+        showToast(`Image Generation Error: ${errMsg}`, 'error', 5000);
+      }
+      appendTerminalLog({ level: 'error', message: `Image generation failed: ${errMsg}` });
     } finally {
       btnGenVisual.disabled = false;
-      btnGenVisual.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Generate Image`;
+      btnGenVisual.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Generate image`;
     }
   });
 
   // Zoom / Lightbox Trigger on Preview Images
-  previewImg?.addEventListener('click', () => {
-    if (previewImg.src) openLightbox(previewImg.src, 'Generated AI Image Preview');
+  document.getElementById('previewImgContainer')?.addEventListener('click', () => {
+    if (previewImg?.src) openLightbox(previewImg.src, 'Attached Visual Preview');
   });
 
   document.getElementById('btnZoomVisual')?.addEventListener('click', () => {

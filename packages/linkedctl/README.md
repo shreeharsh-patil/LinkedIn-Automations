@@ -1,8 +1,4 @@
-![LinkedCtl: The Complete CLI & MCP for LinkedIn](https://raw.githubusercontent.com/linkedctl/.github/main/profile/assets/social-preview.png)
-
-[![CI](https://img.shields.io/github/check-runs/alexey-pelykh/linkedctl/main)](https://github.com/alexey-pelykh/linkedctl/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/alexey-pelykh/linkedctl/actions/workflows/codeql.yml/badge.svg)](https://github.com/alexey-pelykh/linkedctl/actions/workflows/codeql.yml)
-[![License](https://img.shields.io/github/license/alexey-pelykh/linkedctl)](https://www.gnu.org/licenses/agpl-3.0.txt)
+# 🚀 LinkedIn CLI & MCP Server
 
 OAuth2 CLI and MCP server for the [LinkedIn](https://www.linkedin.com) API.
 
@@ -49,7 +45,7 @@ npx linkedctl --help
     linkedctl post "Hello from LinkedCtl!"
     ```
 
-See the [OAuth Setup Guide](https://github.com/alexey-pelykh/linkedctl/blob/main/docs/oauth-setup.md) for detailed step-by-step instructions.
+See the [OAuth Setup Guide](../../docs/oauth-setup.md) for detailed step-by-step instructions.
 
 ## MCP Integration
 

@@ -346,4 +346,46 @@ describe("Scheduler — idempotency", () => {
     // LinkedIn API should only be called once (for the first post)
     expect(mockPublisher.publishText).toHaveBeenCalledOnce();
   });
+
+  it("prevents two concurrent workers from publishing the same scheduled post", async () => {
+    const mockPublisher = createMockPublisher();
+    const idempotent = new IdempotentPublisher(storage, mockPublisher as never);
+
+    const workerA = new Scheduler(storage, idempotent);
+    const workerB = new Scheduler(storage, idempotent);
+
+    const text = "Concurrent race test post";
+    insertScheduledDraft(text);
+
+    // Run poll cycles concurrently
+    const [resultsA, resultsB] = await Promise.all([
+      workerA.pollCycle(),
+      workerB.pollCycle(),
+    ]);
+
+    const allPublished = [...resultsA, ...resultsB].filter((r) => r.success && !r.alreadyPublished);
+    // Only one worker should have published the post
+    expect(allPublished).toHaveLength(1);
+    expect(mockPublisher.publishText).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves attempts and does not republish after worker restart", async () => {
+    const mockPublisher = createMockPublisher();
+    const idempotent = new IdempotentPublisher(storage, mockPublisher as never);
+
+    const text = "Restart persistence test";
+    insertScheduledDraft(text);
+
+    const worker1 = new Scheduler(storage, idempotent);
+    const results1 = await worker1.pollCycle();
+    expect(results1).toHaveLength(1);
+    expect(results1[0]?.success).toBe(true);
+
+    // Simulate worker process restart
+    const worker2 = new Scheduler(storage, idempotent);
+    const results2 = await worker2.pollCycle();
+    // No due posts remaining; must not publish again
+    expect(results2).toHaveLength(0);
+    expect(mockPublisher.publishText).toHaveBeenCalledTimes(1);
+  });
 });

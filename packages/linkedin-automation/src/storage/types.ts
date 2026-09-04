@@ -4,19 +4,25 @@
 /**
  * Post lifecycle states.
  *
- * Posts flow through: DISCOVERED → ANALYZING → DRAFT → REVIEW_REQUIRED → APPROVED
- * → SCHEDULED → PROCESSING → PUBLISHED (or FAILED/SKIPPED).
+ * Full lifecycle covers:
+ * DISCOVERED → ANALYZING → GENERATED → VALIDATED → DRAFT → REVIEW_REQUIRED → APPROVED
+ * → QUEUED / SCHEDULED → PUBLISHING / PROCESSING → PUBLISHED (or FAILED/CANCELLED/SKIPPED).
  */
 export type PostState =
   | "DISCOVERED"
   | "ANALYZING"
+  | "GENERATED"
+  | "VALIDATED"
   | "DRAFT"
   | "REVIEW_REQUIRED"
   | "APPROVED"
+  | "QUEUED"
   | "SCHEDULED"
+  | "PUBLISHING"
   | "PROCESSING"
   | "PUBLISHED"
   | "FAILED"
+  | "CANCELLED"
   | "SKIPPED";
 
 /**
@@ -25,13 +31,18 @@ export type PostState =
 export const POST_STATES: readonly PostState[] = [
   "DISCOVERED",
   "ANALYZING",
+  "GENERATED",
+  "VALIDATED",
   "DRAFT",
   "REVIEW_REQUIRED",
   "APPROVED",
+  "QUEUED",
   "SCHEDULED",
+  "PUBLISHING",
   "PROCESSING",
   "PUBLISHED",
   "FAILED",
+  "CANCELLED",
   "SKIPPED",
 ] as const;
 
@@ -39,15 +50,20 @@ export const POST_STATES: readonly PostState[] = [
  * Valid state transitions.
  */
 export const VALID_TRANSITIONS: ReadonlyMap<PostState, readonly PostState[]> = new Map([
-  ["DISCOVERED", ["ANALYZING", "SKIPPED"]],
-  ["ANALYZING", ["DRAFT", "SKIPPED", "FAILED"]],
-  ["DRAFT", ["REVIEW_REQUIRED", "SKIPPED"]],
-  ["REVIEW_REQUIRED", ["APPROVED", "SKIPPED", "FAILED"]],
-  ["APPROVED", ["SCHEDULED", "SKIPPED"]],
-  ["SCHEDULED", ["PROCESSING", "FAILED"]],
-  ["PROCESSING", ["PUBLISHED", "FAILED"]],
+  ["DISCOVERED", ["ANALYZING", "GENERATED", "SKIPPED"]],
+  ["ANALYZING", ["GENERATED", "DRAFT", "SKIPPED", "FAILED"]],
+  ["GENERATED", ["VALIDATED", "DRAFT", "FAILED", "SKIPPED"]],
+  ["VALIDATED", ["DRAFT", "REVIEW_REQUIRED", "APPROVED", "FAILED", "SKIPPED"]],
+  ["DRAFT", ["VALIDATED", "REVIEW_REQUIRED", "APPROVED", "QUEUED", "SCHEDULED", "SKIPPED", "CANCELLED"]],
+  ["REVIEW_REQUIRED", ["APPROVED", "DRAFT", "SKIPPED", "FAILED", "CANCELLED"]],
+  ["APPROVED", ["QUEUED", "SCHEDULED", "PUBLISHING", "PROCESSING", "SKIPPED", "CANCELLED"]],
+  ["QUEUED", ["PUBLISHING", "PROCESSING", "FAILED", "CANCELLED"]],
+  ["SCHEDULED", ["QUEUED", "PUBLISHING", "PROCESSING", "FAILED", "CANCELLED"]],
+  ["PUBLISHING", ["PUBLISHED", "FAILED", "SCHEDULED"]],
+  ["PROCESSING", ["PUBLISHED", "FAILED", "SCHEDULED"]],
   ["PUBLISHED", []],
   ["FAILED", []],
+  ["CANCELLED", []],
   ["SKIPPED", []],
 ]);
 
@@ -115,6 +131,10 @@ export interface PostDraftRecord {
   reviewScore: number;
   /** Review suggestions (JSON array). */
   suggestions: string[];
+  /** Path to local image/visual attachment if any. */
+  imagePath?: string | undefined;
+  /** LinkedIn media URN if already uploaded. */
+  mediaUrn?: string | undefined;
   /** Current lifecycle state. */
   state: PostState;
   /** Content hash for idempotency. */
@@ -133,7 +153,7 @@ export interface ScheduledPostRecord {
   id: number;
   /** Reference to the post draft. */
   draftId: number;
-  /** ISO-8601 scheduled publish time. */
+  /** ISO-8601 scheduled publish time (always stored in UTC). */
   scheduledAt: string;
   /** Publishing lock identifier (UUID). */
   lockId: string | undefined;
@@ -141,6 +161,12 @@ export interface ScheduledPostRecord {
   lockExpiresAt: string | undefined;
   /** Current lifecycle state. */
   state: PostState;
+  /** Retry attempt counter. */
+  attempts: number;
+  /** Last error message if failed. */
+  lastError?: string | undefined;
+  /** Deterministic idempotency key for this scheduled post. */
+  idempotencyKey?: string | undefined;
   /** ISO-8601 creation timestamp. */
   createdAt: string;
   /** ISO-8601 last-update timestamp. */
@@ -163,6 +189,8 @@ export interface PublishedPostRecord {
   linkedinPostUrl: string;
   /** Content hash of the published text (for duplicate detection). */
   contentHash: string;
+  /** Deterministic idempotency key. */
+  idempotencyKey?: string | undefined;
   /** ISO-8601 publish timestamp. */
   publishedAt: string;
   /** ISO-8601 creation timestamp. */

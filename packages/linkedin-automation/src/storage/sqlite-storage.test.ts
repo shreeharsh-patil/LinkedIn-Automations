@@ -261,6 +261,40 @@ describe("SqliteStorage — Scheduled Posts", () => {
     const next = storage.getNextScheduledPost();
     expect(next).toBeUndefined();
   });
+
+  it("atomically claims and locks next scheduled post", () => {
+    const draftId = storage.insertDraft(makeDraft("c1"));
+    const now = new Date().toISOString();
+
+    const id = storage.insertScheduledPost({
+      draftId,
+      scheduledAt: now,
+      lockId: undefined,
+      lockExpiresAt: undefined,
+      state: "SCHEDULED",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const claimed = storage.claimNextScheduledPost("worker-lock-1", 60_000);
+    expect(claimed).toBeDefined();
+    expect(claimed?.id).toBe(id);
+    expect(claimed?.state).toBe("PROCESSING");
+    expect(claimed?.lockId).toBe("worker-lock-1");
+
+    // Second claim attempt must return undefined (cannot claim already claimed job)
+    const secondClaim = storage.claimNextScheduledPost("worker-lock-2", 60_000);
+    expect(secondClaim).toBeUndefined();
+  });
+
+  it("updates draft media and persists image path", () => {
+    const draftId = storage.insertDraft(makeDraft("c1"));
+    storage.updateDraftMedia(draftId, "/media/photos/test.png", "urn:li:image:12345");
+
+    const draft = storage.getDraft(draftId);
+    expect(draft?.imagePath).toBe("/media/photos/test.png");
+    expect(draft?.mediaUrn).toBe("urn:li:image:12345");
+  });
 });
 
 describe("SqliteStorage — Published Posts", () => {
