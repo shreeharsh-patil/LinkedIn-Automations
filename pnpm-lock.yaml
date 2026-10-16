@@ -13,8 +13,8 @@ catalogs:
       specifier: ^1.26.0
       version: 1.27.1
     '@tony.ganchev/eslint-plugin-header':
-      specifier: ^3.2.4
-      version: 3.2.4
+      specifier: ^3.4.4
+      version: 3.4.4
     '@types/node':
       specifier: ^25
       version: 25.4.0
@@ -64,7 +64,7 @@ importers:
         version: 9.39.4
       '@tony.ganchev/eslint-plugin-header':
         specifier: 'catalog:'
-        version: 3.2.4(eslint@10.0.3)
+        version: 3.4.4(eslint@10.0.3)
       '@vitest/coverage-v8':
         specifier: 'catalog:'
         version: 4.0.18(vitest@4.0.18(@types/node@25.4.0)(yaml@2.8.2))
@@ -691,8 +691,8 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@tony.ganchev/eslint-plugin-header@3.2.4':
-    resolution: {integrity: sha512-zqMKTW/KQmqKGINkhwEPoJFcJ0ewUkUAmvzHLB5N+n/6bsk7D/xkQ50VhUakG2P4JHHtqsncaXrPxgSeuBPmOw==}
+  '@tony.ganchev/eslint-plugin-header@3.4.4':
+    resolution: {integrity: sha512-O3PDvjikVWECu078bLdRb2HwjVgR+wa7D0GX8gN1A8axlgEc7tordHOoEYcKRVxGcAw7bxXjwiKGXaY17qXD+Q==}
     peerDependencies:
       eslint: '>=7.7.0'
 
@@ -2429,7 +2429,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@tony.ganchev/eslint-plugin-header@3.2.4(eslint@10.0.3)':
+  '@tony.ganchev/eslint-plugin-header@3.4.4(eslint@10.0.3)':
     dependencies:
       eslint: 10.0.3
 
